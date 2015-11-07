@@ -1,0 +1,12 @@
+{
+  "intents": [
+    {
+      "intent": "GETRESPONSE",
+      "slots": []
+    },
+    {
+      "intent": "WHATISMYID",
+      "slots": []
+    }
+  ]
+}

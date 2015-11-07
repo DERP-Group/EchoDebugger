@@ -1,0 +1,14 @@
+GETRESPONSE what is my response
+GETRESPONSE to get the response
+GETRESPONSE to get my response
+GETRESPONSE to give the response
+GETRESPONSE to give me my response
+GETRESPONSE to play the response
+GETRESPONSE to play my response
+GETRESPONSE to play
+GETRESPONSE to open the response
+GETRESPONSE to open my response
+GETRESPONSE to open
+WHATISMYID what is my id
+WHATISMYID give me my id
+WHATISMYID to give me my id

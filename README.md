@@ -3,7 +3,7 @@ Allows the RESTful submission of Echo service responses, which can then be "play
 This lets us rapidly test SSML pronunciations, timing, and delivery of content.
 
 ## Posting a response to your Echo
-`
+```
 POST /echodebugger/user/{echoId}/
 {
   "version": null,
@@ -22,7 +22,7 @@ POST /echodebugger/user/{echoId}/
   },
   "sessionAttributes": null
 }
-`
+```
 
 ## Getting your current response
 `
