@@ -1,0 +1,5 @@
+com\derpgroup\echodebugger\resource\EchoDebuggerResource.class
+com\derpgroup\echodebugger\manager\EchoDebuggerManager.class
+com\derpgroup\echodebugger\configuration\MainConfig.class
+com\derpgroup\echodebugger\health\BasicHealthCheck.class
+com\derpgroup\echodebugger\App.class
