@@ -11,7 +11,7 @@ POST /echodebugger/user/{echoId}/
     "outputSpeech": {
       "type": "SSML",
       "id": null,
-      "ssml": "<speak><phoneme alphabet=\"ipa\" ph=\"k?mpl?b?t\"> complibot </phoneme></speak>"
+      "ssml": "<speak><phoneme alphabet=\"ipa\" ph=\"kɒmpləbɑt\"> complibot </phoneme> is awesome!</speak>"
     },
     "card": {
       "type": "Simple",
