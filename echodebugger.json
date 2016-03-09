@@ -1,4 +1,7 @@
 {
+  "echoDebuggerConfig": {
+    "password":"password"
+  },
   "server": {
     "applicationConnectors": [
       {
@@ -22,18 +25,31 @@
     ]
   },
   "logging": {
-    "appenders": [
-      {
-        "type": "file",
-        "currentLogFilename": "/var/log/echodebugger/echodebugger.log",
-        "archivedLogFilenamePattern": "/var/log/echodebugger/echodebugger-%d.log",
-        "archivedFileCount": 5
-      }
-    ],
     "level": "INFO",
     "loggers": {
-      "com": {
-        "derpgroup": "DEBUG"
+      "com.derpgroup": {
+        "level": "INFO",
+        "appenders": [
+          {
+            "type": "file",
+            "currentLogFilename": "/var/log/echodebugger/echodebugger.log",
+            "archivedLogFilenamePattern": "/var/log/echodebugger/echodebugger-%d.log",
+            "archivedFileCount": 5
+          }
+        ]
+      },
+      "com.derpgroup.echodebugger.logger": {
+        "level": "DEBUG",
+        "additive": false,
+        "appenders": [
+          {
+            "type": "file",
+            "currentLogFilename": "/var/log/echodebugger/metrics.log",
+            "archivedLogFilenamePattern": "/var/log/echodebugger/metrics-%d.log",
+            "archivedFileCount": 5,
+            "logFormat": "%date{yyyy-MM-dd HH:mm:ss.SSS},%msg%n"
+          }
+        ]
       }
     }
   }

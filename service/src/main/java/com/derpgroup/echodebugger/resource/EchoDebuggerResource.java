@@ -42,6 +42,7 @@ import com.amazon.speech.json.SpeechletResponseEnvelope;
 import com.amazon.speech.speechlet.IntentRequest;
 import com.amazon.speech.speechlet.SpeechletException;
 import com.derpgroup.echodebugger.configuration.MainConfig;
+import com.derpgroup.echodebugger.logger.EchoDebuggerLogger;
 import com.derpgroup.echodebugger.manager.EchoDebuggerManager;
 
 
@@ -51,7 +52,7 @@ import com.derpgroup.echodebugger.manager.EchoDebuggerManager;
  * @author David
  * @since 0.0.1
  */
-@Path("/echodebugger")
+@Path("/responder")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class EchoDebuggerResource {
@@ -69,7 +70,7 @@ public class EchoDebuggerResource {
   @Path("/user/{echoId}")
   @POST
   public Map<String, Object> saveResponseForEchoId(Map<String, Object> body, @PathParam("echoId") String echoId){
-    log.info("saveResponseForEchoId("+echoId+"): "+body.toString());
+    EchoDebuggerLogger.logSaveNewResponse(body, echoId);
     userData.put(echoId, body);
     return body;
   }
@@ -77,7 +78,8 @@ public class EchoDebuggerResource {
   @Path("/user/{echoId}")
   @GET
   public Map<String, Object> getResponseForEchoId(@PathParam("echoId") String echoId){
-    log.info("getResponseForEchoId("+echoId+"): "+userData.get(echoId));
+//    log.info("getResponseForEchoId("+echoId+"): "+userData.get(echoId));
+    EchoDebuggerLogger.logAccessRequest(echoId,"SINGLE_RESPONSE");
     if(!userData.containsKey(echoId)){
       Map<String, Object> response = new HashMap<String, Object>();
       response.put("Result", "There are no responses stored for user ("+echoId+")");
@@ -88,13 +90,14 @@ public class EchoDebuggerResource {
   
   @Path("/user")
   @GET
-  public Object getResponsesByEchoId(@QueryParam("showAllUsers") String showAllUsers){
-    if(showAllUsers==null || !showAllUsers.equals("true")){
+  public Object getAllResponses(@QueryParam("p") String p){
+    EchoDebuggerLogger.logAccessRequest("ROOT","ALL_RESPONSES,p="+p);
+    if(p==null || !p.equals("true")){
       Map<String, Object> response = new HashMap<String, Object>();
-      response.put("Result", "To retrieve your response please use the format /echodebugger/user/{yourEchoId}");
+      // TODO: Make this HTML?
+      response.put("Result", "To retrieve your response please use the format /responder/user/{yourEchoId}\nIf you do not know your echoId, please ask the Responder skill 'What is my id?'");
       return response;
     }
-    log.info("getResponsesByEchoId(): Knew the secret query param to see all user responses");
     return userData.entrySet();
   }
 
@@ -102,10 +105,9 @@ public class EchoDebuggerResource {
   public Object handleEchoRequest(SpeechletRequestEnvelope request) throws SpeechletException{
     
     if (request==null || request.getRequest() == null) {
-      log.info("Missing request body.");
+      // TODO: Investigate this for bullet-proofness
       throw new RuntimeException("Missing request body.");
     }
-    log.info("handleEchoRequest(): "+request.toString());
 
     String intent = "NOINTENT";
     if(request.getRequest()!=null){
@@ -116,7 +118,12 @@ public class EchoDebuggerResource {
       IntentRequest intentRequest = (IntentRequest) request.getRequest();
       intent = intentRequest.getIntent().getName();
     }
-    log.info("Intent received: "+intent);
+    else{
+      return new SpeechletResponseEnvelope(); // TODO: Give some error
+    }
+    
+    String userId = request.getSession().getUser().getUserId();
+    EchoDebuggerLogger.logEchoRequest(userId,intent);
 
     switch(intent){
     case "NOINTENT":
@@ -127,8 +134,6 @@ public class EchoDebuggerResource {
     case "GETRESPONSE":
       // might have id's in slots for groupId and bucketId
       // For now just return the only one
-      
-      String userId = request.getSession().getUser().getUserId();
       if(!userData.containsKey(userId)){
         log.info("There were no saved responses for user ("+userId+")");
         return manager.createSimpleResponse("You have no saved responses","There are no saved responses for your Echo ID ("+userId+")","There are no saved responses");

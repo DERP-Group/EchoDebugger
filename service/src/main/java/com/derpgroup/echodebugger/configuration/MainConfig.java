@@ -32,6 +32,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class MainConfig extends Configuration {
   private boolean prettyPrint = true;
+  private EchoDebuggerConfig echoDebuggerConfig;
 
   @JsonProperty
   public boolean isPrettyPrint() {
@@ -41,5 +42,15 @@ public class MainConfig extends Configuration {
   @JsonProperty
   public void setPrettyPrint(boolean prettyPrint) {
     this.prettyPrint = prettyPrint;
+  }
+
+  @JsonProperty
+  public EchoDebuggerConfig getEchoDebuggerConfig() {
+    return echoDebuggerConfig;
+  }
+
+  @JsonProperty
+  public void setEchoDebuggerConfig(EchoDebuggerConfig echoDebuggerConfig) {
+    this.echoDebuggerConfig = echoDebuggerConfig;
   }
 }
