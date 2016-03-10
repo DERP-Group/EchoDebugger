@@ -17,11 +17,11 @@ public class EchoDebuggerLogger {
    */
   public static void logSaveNewResponse(Map<String, Object> postBody, String echoId){
     ObjectMapper mapper = new ObjectMapper();
-    String result = "Could not parse";
+    String result = null;
     try {
       result = mapper.writeValueAsString(postBody);
     } catch (JsonProcessingException e) {
-      
+      result = "Could not parse";
     }
     LOG.info(echoId+",NEW_RESPONSE,"+result);
   }

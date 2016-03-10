@@ -43,7 +43,10 @@ import com.amazon.speech.speechlet.IntentRequest;
 import com.amazon.speech.speechlet.SpeechletException;
 import com.derpgroup.echodebugger.configuration.MainConfig;
 import com.derpgroup.echodebugger.logger.EchoDebuggerLogger;
-import com.derpgroup.echodebugger.manager.EchoDebuggerManager;
+import com.derpgroup.echodebugger.model.ContentDao;
+import com.derpgroup.echodebugger.util.AlexaResponseUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 
 /**
@@ -58,55 +61,77 @@ import com.derpgroup.echodebugger.manager.EchoDebuggerManager;
 public class EchoDebuggerResource {
   final static Logger log = LoggerFactory.getLogger(EchoDebuggerResource.class);
 
-  private EchoDebuggerManager manager;
-  
-  // Temp data structure
-  Map<String,Map<String, Object>> userData = new HashMap<String,Map<String, Object>>();
+  private ContentDao contentDao;
+  private String password;
+  private Integer maxAllowedResponseLength;
+  private Boolean debugMode;
 
   public EchoDebuggerResource(MainConfig config, Environment env) {
-    manager = new EchoDebuggerManager();
+    password = config.getEchoDebuggerConfig().getPassword();
+    maxAllowedResponseLength = config.getEchoDebuggerConfig().getMaxAllowedResponseLength();
+    debugMode = config.getEchoDebuggerConfig().getDebugMode();
   }
   
   @Path("/user/{echoId}")
   @POST
   public Map<String, Object> saveResponseForEchoId(Map<String, Object> body, @PathParam("echoId") String echoId){
     EchoDebuggerLogger.logSaveNewResponse(body, echoId);
-    userData.put(echoId, body);
+    
+    ObjectMapper mapper = new ObjectMapper();
+    String serializedBody = null;
+    try {
+      serializedBody = mapper.writeValueAsString(body);
+    } catch (JsonProcessingException e) {
+      serializedBody = "Failed to save response";
+    }
+    
+    // Abort storing it if the request is too long
+    int responseLength = serializedBody.length();
+    if(responseLength > maxAllowedResponseLength){
+      Map<String, Object> response = new HashMap<String, Object>();
+      response.put("Result", "The response is too long. Alexa limits response sizes to 8000 characters. This response was "+responseLength+" characters long. Please see their restrictions here: https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/alexa-skills-kit-interface-reference#Response%20Format");
+      return response;
+    }
+    
+    // If the request is for an ID that we haven't seen before, refuse it
+    if(debugMode || !contentDao.containsUser(echoId)){
+      Map<String, Object> response = new HashMap<String, Object>();
+      response.put("Result", "The response is too long. Alexa limits response sizes to 8000 characters. This response was "+responseLength+" characters long. Please see their restrictions here: https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/alexa-skills-kit-interface-reference#Response%20Format");
+      return response;
+    }
+    contentDao.saveUserData(echoId, body);
     return body;
   }
   
   @Path("/user/{echoId}")
   @GET
   public Map<String, Object> getResponseForEchoId(@PathParam("echoId") String echoId){
-//    log.info("getResponseForEchoId("+echoId+"): "+userData.get(echoId));
     EchoDebuggerLogger.logAccessRequest(echoId,"SINGLE_RESPONSE");
-    if(!userData.containsKey(echoId)){
+    if(!contentDao.containsUser(echoId)){
       Map<String, Object> response = new HashMap<String, Object>();
       response.put("Result", "There are no responses stored for user ("+echoId+")");
       return response;
     }
-    return userData.get(echoId);
+    return contentDao.getUserContent(echoId);
   }
   
   @Path("/user")
   @GET
   public Object getAllResponses(@QueryParam("p") String p){
     EchoDebuggerLogger.logAccessRequest("ROOT","ALL_RESPONSES,p="+p);
-    if(p==null || !p.equals("true")){
+    if(p==null || !p.equals(password)){
       Map<String, Object> response = new HashMap<String, Object>();
-      // TODO: Make this HTML?
-      response.put("Result", "To retrieve your response please use the format /responder/user/{yourEchoId}\nIf you do not know your echoId, please ask the Responder skill 'What is my id?'");
+      response.put("Result", "To retrieve your response please use the format /responder/user/{yourEchoId}");
       return response;
     }
-    return userData.entrySet();
+    return contentDao.getUserData().entrySet();
   }
 
   @POST
   public Object handleEchoRequest(SpeechletRequestEnvelope request) throws SpeechletException{
     
     if (request==null || request.getRequest() == null) {
-      // TODO: Investigate this for bullet-proofness
-      throw new RuntimeException("Missing request body.");
+      return new SpeechletResponseEnvelope(); // TODO: Give some error
     }
 
     String intent = "NOINTENT";
@@ -118,37 +143,34 @@ public class EchoDebuggerResource {
       IntentRequest intentRequest = (IntentRequest) request.getRequest();
       intent = intentRequest.getIntent().getName();
     }
-    else{
-      return new SpeechletResponseEnvelope(); // TODO: Give some error
-    }
     
     String userId = request.getSession().getUser().getUserId();
     EchoDebuggerLogger.logEchoRequest(userId,intent);
 
     switch(intent){
     case "NOINTENT":
-      return manager.createSimpleResponse("How to use Echo Debugger",
-          "TODO: Attach information here",
-          "You must load Echo responses through REST calls before you can retrieve them using your Echo. I have attached additional information in this response to help you do this.");
+      return AlexaResponseUtil.createSimpleResponse("How to use Echo Debugger",
+          "TODO: Attach information here",// TODO: Here
+          "You must upload your desired Echo response before you can retrieve them using your Echo. I have attached additional information in this response to help you do this.");
       
     case "GETRESPONSE":
-      // might have id's in slots for groupId and bucketId
-      // For now just return the only one
-      if(!userData.containsKey(userId)){
-        log.info("There were no saved responses for user ("+userId+")");
-        return manager.createSimpleResponse("You have no saved responses","There are no saved responses for your Echo ID ("+userId+")","There are no saved responses");
+      if(!contentDao.containsUser(userId)){
+        return AlexaResponseUtil.createSimpleResponse("You have no saved responses","There are no saved responses for your Echo ID ("+userId+")","There are no saved responses");
       }
-      log.info("Returning saved response for user ("+userId+"):\n"+userData.get(userId).toString());
-      return userData.get(userId);
+      return contentDao.getUserContent(userId);
       
     case "WHATISMYID":
-      log.info("Query for Echo ID by: ("+request.getSession().getUser().getUserId()+")");
-      String echoResponse = "Your Echo ID is "+request.getSession().getUser().getUserId();
-      return manager.createSimpleResponse(echoResponse);
+      String title = "Echo ID";
+      String content = "Your Echo ID is "+request.getSession().getUser().getUserId();
+      String ssml = "Your Echo ID is "+request.getSession().getUser().getUserId()+" <break /> I hope you got that. Because I won't repeat it. <break /> "
+          + "I'm just kidding. Please check your Alexa app to see the exact spelling. It is case-sensitive. This ID is unique between you and this skill. If you delete the skill you will be issued a new ID when you next connect.";
+      return AlexaResponseUtil.createSimpleResponse(title,content,ssml);
       
     default:
-      log.info("Encountered unexpected intent type! "+intent);
       throw new SpeechletException("Invalid Intent");
     }
   }
+
+  public ContentDao getContentDao() {return contentDao;}
+  public void setContentDao(ContentDao contentDao) {this.contentDao = contentDao;}
 }
