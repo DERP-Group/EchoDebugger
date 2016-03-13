@@ -5,6 +5,7 @@ public class EchoDebuggerConfig {
   private Integer maxAllowedResponseLength;
   private Boolean debugMode;
   private String contentFile;
+  private Integer saveRate;
 
   public String getPassword() {return password;}
   public void setPassword(String password) {this.password = password;}
@@ -14,4 +15,6 @@ public class EchoDebuggerConfig {
   public void setDebugMode(Boolean debugMode) {this.debugMode = debugMode;}
   public String getContentFile() {return contentFile;}
   public void setContentFile(String contentFile) {this.contentFile = contentFile;}
+  public Integer getSaveRate() {return saveRate;}
+  public void setSaveRate(Integer saveRate) {this.saveRate = saveRate;}
 }

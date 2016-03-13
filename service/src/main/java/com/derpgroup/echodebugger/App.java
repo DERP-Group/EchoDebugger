@@ -28,7 +28,8 @@ import java.io.IOException;
 
 import com.derpgroup.echodebugger.configuration.MainConfig;
 import com.derpgroup.echodebugger.health.BasicHealthCheck;
-import com.derpgroup.echodebugger.model.ContentDao;
+import com.derpgroup.echodebugger.jobs.UserDaoLocalImplThread;
+import com.derpgroup.echodebugger.model.UserDaoLocalImpl;
 import com.derpgroup.echodebugger.resource.EchoDebuggerResource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -59,12 +60,15 @@ public class App extends Application<MainConfig> {
     environment.healthChecks().register("basics", new BasicHealthCheck(config, environment));
 
     // Load up the content
-    ContentDao contentDao = new ContentDao(config, environment);
+    UserDaoLocalImpl userDao = new UserDaoLocalImpl(config, environment);
+    userDao.initialize();
     
     // Build the helper thread that saves data every X minutes
+    UserDaoLocalImplThread userThread = new UserDaoLocalImplThread(config, userDao);
+    userThread.start();
     
     EchoDebuggerResource debuggerResource = new EchoDebuggerResource(config, environment);
-    debuggerResource.setContentDao(contentDao);
+    debuggerResource.setUserDao(userDao);
     
     // Resources
     environment.jersey().register(debuggerResource);

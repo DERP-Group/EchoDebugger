@@ -20,6 +20,7 @@
 
 package com.derpgroup.echodebugger.resource;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -43,7 +44,8 @@ import com.amazon.speech.speechlet.IntentRequest;
 import com.amazon.speech.speechlet.SpeechletException;
 import com.derpgroup.echodebugger.configuration.MainConfig;
 import com.derpgroup.echodebugger.logger.EchoDebuggerLogger;
-import com.derpgroup.echodebugger.model.ContentDao;
+import com.derpgroup.echodebugger.model.User;
+import com.derpgroup.echodebugger.model.UserDao;
 import com.derpgroup.echodebugger.util.AlexaResponseUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,7 +63,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class EchoDebuggerResource {
   final static Logger log = LoggerFactory.getLogger(EchoDebuggerResource.class);
 
-  private ContentDao contentDao;
+  private UserDao userDao;
   private String password;
   private Integer maxAllowedResponseLength;
   private Boolean debugMode;
@@ -76,30 +78,36 @@ public class EchoDebuggerResource {
   @POST
   public Map<String, Object> saveResponseForEchoId(Map<String, Object> body, @PathParam("echoId") String echoId){
     EchoDebuggerLogger.logSaveNewResponse(body, echoId);
+    User user = userDao.getUser(echoId);
     
-    ObjectMapper mapper = new ObjectMapper();
-    String serializedBody = null;
-    try {
-      serializedBody = mapper.writeValueAsString(body);
-    } catch (JsonProcessingException e) {
-      serializedBody = "Failed to save response";
+    // If the request is for an ID that we haven't seen before, refuse it
+    if(user == null){
+      if(debugMode){
+        userDao.createUser(echoId);
+        user = userDao.getUser(echoId);
+      }
+      else{
+        Map<String, Object> response = new HashMap<String, Object>();
+        response.put("Result", "This is not a known Echo ID. Please access this skill through your Echo to automatically register your Echo's ID.");
+        return response;
+      }
     }
     
+    user.setLastUploadTime(Instant.now());
+    user.setNumContentUploads(user.getNumContentUploads()+1);
+    
     // Abort storing it if the request is too long
-    int responseLength = serializedBody.length();
+    int responseLength = getLengthOfContent(body);
+    user.setNumCharactersUploaded(user.getNumCharactersUploaded()+responseLength);
     if(responseLength > maxAllowedResponseLength){
       Map<String, Object> response = new HashMap<String, Object>();
       response.put("Result", "The response is too long. Alexa limits response sizes to 8000 characters. This response was "+responseLength+" characters long. Please see their restrictions here: https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/alexa-skills-kit-interface-reference#Response%20Format");
+      user.setNumUploadsTooLarge(user.getNumUploadsTooLarge()+1);
+      userDao.saveUser(user);
       return response;
     }
-    
-    // If the request is for an ID that we haven't seen before, refuse it
-    if(debugMode || !contentDao.containsUser(echoId)){
-      Map<String, Object> response = new HashMap<String, Object>();
-      response.put("Result", "The response is too long. Alexa limits response sizes to 8000 characters. This response was "+responseLength+" characters long. Please see their restrictions here: https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/alexa-skills-kit-interface-reference#Response%20Format");
-      return response;
-    }
-    contentDao.saveUserData(echoId, body);
+    user.setData(body);
+    userDao.saveUser(user);
     return body;
   }
   
@@ -107,12 +115,25 @@ public class EchoDebuggerResource {
   @GET
   public Map<String, Object> getResponseForEchoId(@PathParam("echoId") String echoId){
     EchoDebuggerLogger.logAccessRequest(echoId,"SINGLE_RESPONSE");
-    if(!contentDao.containsUser(echoId)){
+    User user = userDao.getUser(echoId);
+    if(user==null){
+      Map<String, Object> response = new HashMap<String, Object>();
+      response.put("Result", "There is no user with the id of ("+echoId+")");
+      return response;
+    }
+    user.setLastWebDownloadTime(Instant.now());
+    user.setNumContentDownloads(user.getNumContentDownloads()+1);
+    int responseLength = getLengthOfContent(user.getData());
+    user.setNumCharactersDownloaded(user.getNumCharactersDownloaded()+responseLength);
+    userDao.saveUser(user);
+    
+    if(user.getData()==null){
       Map<String, Object> response = new HashMap<String, Object>();
       response.put("Result", "There are no responses stored for user ("+echoId+")");
       return response;
     }
-    return contentDao.getUserContent(echoId);
+    
+    return user.getData();
   }
   
   @Path("/user")
@@ -124,7 +145,7 @@ public class EchoDebuggerResource {
       response.put("Result", "To retrieve your response please use the format /responder/user/{yourEchoId}");
       return response;
     }
-    return contentDao.getUserData().entrySet();
+    return userDao.getAllUserData();
   }
 
   @POST
@@ -135,29 +156,40 @@ public class EchoDebuggerResource {
     }
 
     String intent = "NOINTENT";
-    if(request.getRequest()!=null){
-      if(!(request.getRequest() instanceof IntentRequest)){
-        log.info("handleEchoRequest(): Intent is not an IntentRequest: "+request.getRequest().toString());
-        return new SpeechletResponseEnvelope();
-      }
-      IntentRequest intentRequest = (IntentRequest) request.getRequest();
-      intent = intentRequest.getIntent().getName();
+    if(request.getRequest()!=null && request.getRequest() instanceof IntentRequest){
+//      if(!(request.getRequest() instanceof IntentRequest)){
+//        log.info("handleEchoRequest(): Intent is not an IntentRequest: "+request.getRequest().toString());
+//        return new SpeechletResponseEnvelope();
+//      }
+        IntentRequest intentRequest = (IntentRequest) request.getRequest();
+        intent = intentRequest.getIntent().getName();
     }
     
+    // If the user doesn't exist, create them
     String userId = request.getSession().getUser().getUserId();
+    if(!userDao.containsUser(userId)){
+      userDao.createUser(userId);
+    }
+    User user = userDao.getUser(userId);
     EchoDebuggerLogger.logEchoRequest(userId,intent);
 
     switch(intent){
     case "NOINTENT":
       return AlexaResponseUtil.createSimpleResponse("How to use Echo Debugger",
           "TODO: Attach information here",// TODO: Here
-          "You must upload your desired Echo response before you can retrieve them using your Echo. I have attached additional information in this response to help you do this.");
+          "You must upload your desired Echo response before you can retrieve them using your Echo. Please read the additional information I've just printed in your Alexa app to help you do this.");
       
     case "GETRESPONSE":
-      if(!contentDao.containsUser(userId)){
+      user.setNumContentDownloads(user.getNumContentDownloads()+1);
+      user.setLastEchoDownloadTime(Instant.now());
+      int contentLength = getLengthOfContent(user.getData());
+      user.setNumCharactersDownloaded(user.getNumCharactersDownloaded() + contentLength);
+      userDao.saveUser(user);
+      
+      if(user.getData()==null){
         return AlexaResponseUtil.createSimpleResponse("You have no saved responses","There are no saved responses for your Echo ID ("+userId+")","There are no saved responses");
       }
-      return contentDao.getUserContent(userId);
+      return user.getData();
       
     case "WHATISMYID":
       String title = "Echo ID";
@@ -171,6 +203,17 @@ public class EchoDebuggerResource {
     }
   }
 
-  public ContentDao getContentDao() {return contentDao;}
-  public void setContentDao(ContentDao contentDao) {this.contentDao = contentDao;}
+  public UserDao getUserDao() {return userDao;}
+  public void setUserDao(UserDao userDao) {this.userDao = userDao;}
+
+  public int getLengthOfContent(Map<String, Object> content){
+    if(content == null){return 0;}
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      String serializedBody = mapper.writeValueAsString(content);
+      return serializedBody.length();
+    } catch (JsonProcessingException e) {
+      return 0;
+    }
+  }
 }
