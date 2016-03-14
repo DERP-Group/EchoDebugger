@@ -15,7 +15,7 @@ public class EchoDebuggerLogger {
    * Primary metrics logging function. Logs a user request and associated metadata.
    * @param serviceInput
    */
-  public static void logSaveNewResponse(Map<String, Object> postBody, String echoId){
+  public static void logSaveNewResponse(Map<String, Object> postBody, String echoId, boolean legal){
     ObjectMapper mapper = new ObjectMapper();
     String result = null;
     try {
@@ -23,13 +23,23 @@ public class EchoDebuggerLogger {
     } catch (JsonProcessingException e) {
       result = "Could not parse";
     }
-    LOG.info(echoId+",NEW_RESPONSE,"+result);
+    if(legal){
+      LOG.info(echoId+",NEW_RESPONSE,"+result);
+    }
+    else{
+      LOG.info(echoId+",NEW_ILLEGAL_RESPONSE,"+result);
+    }
   }
   
-  public static void logAccessRequest(String echoId, String message){
-    LOG.info(echoId+",WEB_REQUEST,"+message);
+  public static void logAccessRequest(String echoId, String message, boolean legal){
+    if(legal){
+      LOG.info(echoId+",WEB_REQUEST,"+message);
+    }
+    else{
+      LOG.info(echoId+",ILLEGAL_WEB_REQUEST,"+message);
+    }
   }
-  
+
   public static void logEchoRequest(String echoId, String intent){
     LOG.info(echoId+",ECHO_REQUEST,"+intent);
   }

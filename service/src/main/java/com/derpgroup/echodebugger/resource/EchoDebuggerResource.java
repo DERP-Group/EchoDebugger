@@ -97,20 +97,24 @@ public class EchoDebuggerResource {
   @Path("/user/{echoId}")
   @POST
   public Map<String, Object> saveResponseForEchoId(Map<String, Object> body, @PathParam("echoId") String echoId){
-    EchoDebuggerLogger.logSaveNewResponse(body, echoId);
     User user = userDao.getUser(echoId);
     
     // If the request is for an ID that we haven't seen before, refuse it
     if(user == null){
       if(debugMode){
+        EchoDebuggerLogger.logSaveNewResponse(body, echoId, true);
         userDao.createUser(echoId);
         user = userDao.getUser(echoId);
       }
       else{
+        EchoDebuggerLogger.logSaveNewResponse(body, echoId, false);
         Map<String, Object> response = new HashMap<String, Object>();
         response.put("Result", "This is not a known Echo ID. Please access this skill through your Echo to automatically register your Echo's ID.");
         return response;
       }
+    }
+    else{
+      EchoDebuggerLogger.logSaveNewResponse(body, echoId, true);
     }
     
     user.setLastUploadTime(Instant.now());
@@ -134,13 +138,14 @@ public class EchoDebuggerResource {
   @Path("/user/{echoId}")
   @GET
   public Map<String, Object> getResponseForEchoId(@PathParam("echoId") String echoId){
-    EchoDebuggerLogger.logAccessRequest(echoId,"SINGLE_RESPONSE");
     User user = userDao.getUser(echoId);
     if(user==null){
+      EchoDebuggerLogger.logAccessRequest(echoId,"SINGLE_RESPONSE",false);
       Map<String, Object> response = new HashMap<String, Object>();
       response.put("Result", "There is no user with the id of ("+echoId+")");
       return response;
     }
+    EchoDebuggerLogger.logAccessRequest(echoId,"SINGLE_RESPONSE",true);
     user.setLastWebDownloadTime(Instant.now());
     user.setNumContentDownloads(user.getNumContentDownloads()+1);
     int responseLength = getLengthOfContent(user.getData());
@@ -159,12 +164,13 @@ public class EchoDebuggerResource {
   @Path("/user")
   @GET
   public Object getAllResponses(@QueryParam("p") String p){
-    EchoDebuggerLogger.logAccessRequest("ROOT","ALL_RESPONSES,p="+p);
     if(p==null || !p.equals(password)){
+      EchoDebuggerLogger.logAccessRequest("ROOT","ALL_RESPONSES,p="+p,false);
       Map<String, Object> response = new HashMap<String, Object>();
       response.put("Result", "To retrieve your response please use the format /responder/user/{yourEchoId}");
       return response;
     }
+    EchoDebuggerLogger.logAccessRequest("ROOT","ALL_RESPONSES,p="+p,true);
     return userDao.getAllUserData();
   }
 
