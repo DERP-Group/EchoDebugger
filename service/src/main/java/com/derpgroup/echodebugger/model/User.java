@@ -17,6 +17,7 @@ public class User {
   private Instant lastEchoDownloadTime;
   private int numUploadsTooLarge;
   
+  public User(){}
   public User(String echoId){
     this.echoId = echoId;
     creationTime = Instant.now();

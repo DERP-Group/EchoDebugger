@@ -20,6 +20,10 @@
 
 package com.derpgroup.echodebugger.resource;
 
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,7 +43,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.amazon.speech.json.SpeechletRequestEnvelope;
-import com.amazon.speech.json.SpeechletResponseEnvelope;
 import com.amazon.speech.speechlet.IntentRequest;
 import com.amazon.speech.speechlet.SpeechletException;
 import com.derpgroup.echodebugger.configuration.MainConfig;
@@ -61,17 +64,34 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class EchoDebuggerResource {
-  final static Logger log = LoggerFactory.getLogger(EchoDebuggerResource.class);
+  final static Logger LOG = LoggerFactory.getLogger(EchoDebuggerResource.class);
 
   private UserDao userDao;
   private String password;
   private Integer maxAllowedResponseLength;
   private Boolean debugMode;
+  private String baseUrl;
+  private String introPage;
 
   public EchoDebuggerResource(MainConfig config, Environment env) {
     password = config.getEchoDebuggerConfig().getPassword();
     maxAllowedResponseLength = config.getEchoDebuggerConfig().getMaxAllowedResponseLength();
     debugMode = config.getEchoDebuggerConfig().getDebugMode();
+    baseUrl = config.getEchoDebuggerConfig().getBaseUrl();
+    introPage = config.getEchoDebuggerConfig().getIntroPage();
+  }
+  
+  @Produces(MediaType.TEXT_HTML)
+  @GET
+  public String getRootRequest(){
+    String content;
+    try {
+      content = new String(Files.readAllBytes(Paths.get(introPage)),Charset.defaultCharset());
+    } catch (IOException e) {
+      LOG.error("There was a problem serving the intro page",e);
+      content = "There was a problem. Please refer to the blog posts at www.derpgroup.com for more information.";
+    }
+    return content;
   }
   
   @Path("/user/{echoId}")
@@ -152,15 +172,11 @@ public class EchoDebuggerResource {
   public Object handleEchoRequest(SpeechletRequestEnvelope request) throws SpeechletException{
     
     if (request==null || request.getRequest() == null) {
-      return new SpeechletResponseEnvelope(); // TODO: Give some error
+      throw new SpeechletException("Invalid Request format");
     }
 
     String intent = "NOINTENT";
     if(request.getRequest()!=null && request.getRequest() instanceof IntentRequest){
-//      if(!(request.getRequest() instanceof IntentRequest)){
-//        log.info("handleEchoRequest(): Intent is not an IntentRequest: "+request.getRequest().toString());
-//        return new SpeechletResponseEnvelope();
-//      }
         IntentRequest intentRequest = (IntentRequest) request.getRequest();
         intent = intentRequest.getIntent().getName();
     }
@@ -175,10 +191,32 @@ public class EchoDebuggerResource {
 
     switch(intent){
     case "NOINTENT":
-      return AlexaResponseUtil.createSimpleResponse("How to use Echo Debugger",
-          "TODO: Attach information here",// TODO: Here
-          "You must upload your desired Echo response before you can retrieve them using your Echo. Please read the additional information I've just printed in your Alexa app to help you do this.");
-      
+      String noIntentContent = "Welcome to the Alexa Skills Kit Responder (A.S.K Responder). This is a basic tool that allows you to create mock skill responses, and then play them through your Echo. "
+          + "To use this tool, there are four things you need to do:\n"
+          
+          + "1.) Set up the A.S.K. Responder skill\n"
+          + " You've already done this - else you wouldn't be seeing this. Please verify that your Intent Schema and Sample Utterances match the expected values. See this webpage for further information: "+baseUrl+"responder/\n"
+          
+          + "2.) Get your Echo ID\n"
+          + " Your Echo ID is '"+userId+"'. You will upload your mock skill responses using this ID. If at any time you forget your Echo ID you can ask, 'What is my ID?'\n"
+          
+          + "3.) Upload your mock skill response\n"
+          + " You can register your mock response by doing an HTTP POST request to:\n"+baseUrl+"responder/user/"+userId+"/\n"
+          + " Please note: The Responder is expecting the request body to be a JSON payload, and it expects the content header 'Content-Type' to be 'application/json'. Set this value in your POST request else it won't work.\n"
+          
+          + "4.) Play your response\n"
+          + "Play your mock skill response through the A.S.K. Responder itself (this skill), by saying: 'Play my response'\n"
+          + "For more detailed information on usage please visit "+baseUrl+"responder/";
+
+      String noIntentSsml = "Welcome to the Alexa Skills Kit Responder. This is a basic tool that allows you to create mock skill responses, and then play them through your Echo. "
+          + "To use this tool, there are four things you need to do:<break/><break/>"
+          + "1.) You must set up this skill on your Echo - which you've already done.<break/>"
+          + "2.) You must get your Echo ID. You will upload your mock skill responses using this ID. Your ID is '"+userId+"'. Please refer to the Alexa app to see it. If at any time you forget your Echo ID you can ask me, 'What is my ID'<break/>"
+          + "3.) With that Echo ID you can now do an HTTP POST request to register your mock response. <break/>"
+          + "4.) You can then play your mock response through this skill itself, by saying: 'Play my response' <break/>"
+          + "Please read the additional information I've just printed in your Alexa app to help you do this.";
+      return AlexaResponseUtil.createSimpleResponse("How to use the A.S.K. Responder",noIntentContent,noIntentSsml);
+
     case "GETRESPONSE":
       user.setNumContentDownloads(user.getNumContentDownloads()+1);
       user.setLastEchoDownloadTime(Instant.now());
@@ -194,8 +232,7 @@ public class EchoDebuggerResource {
     case "WHATISMYID":
       String title = "Echo ID";
       String content = "Your Echo ID is "+request.getSession().getUser().getUserId();
-      String ssml = "Your Echo ID is "+request.getSession().getUser().getUserId()+" <break /> I hope you got that. Because I won't repeat it. <break /> "
-          + "I'm just kidding. Please check your Alexa app to see the exact spelling. It is case-sensitive. This ID is unique between you and this skill. If you delete the skill you will be issued a new ID when you next connect.";
+      String ssml = "Your Echo ID is "+request.getSession().getUser().getUserId()+" <break /> Please check your Alexa app to see the exact spelling. It is case-sensitive. This ID is unique between you and this skill. If you delete the skill you will be issued a new ID when you next connect.";
       return AlexaResponseUtil.createSimpleResponse(title,content,ssml);
       
     default:

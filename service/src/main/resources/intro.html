@@ -1,0 +1,201 @@
+<html>
+	<head>
+	<style>
+		td {
+			border: 1px solid black;
+			padding: 2px 5px;
+		}
+		table {
+			border-collapse: collapse;
+		}
+	</style>
+	</head>
+    <body>
+    	<div style="width:800px;">
+        <div style="text-align:center;">
+            <h2 style="margin-bottom:0;">Welcome to the Alexa Skills Kit Responder</h2>
+            <h3 style="margin-top:0;">(A.S.K. Responder)</h3>
+        </div>
+        <div>
+            <p>This page will describe how to get started with the A.S.K. Responder. For further information please see the <a href="www.derpgroup.com">A.S.K. Responder blog post.</a></p>
+        </div>
+        
+        <h1>Setting up the skill</h1>
+        <div>
+        The first thing we need to do is set up the A.S.K. Responder skill in your Alexa app. Unfortunately this is not as simple as merely activating an existing skill.
+        Because this is an Alexa dev tool there is no way it can be certified for use by the public. Therefore you will need to manually configure the settings. Don't worry,
+        it's actually quite simple.
+        <ol>
+        
+        <h3><li>Sign-in to your Alexa dev account</li></h3>
+        <a href="https://developer.amazon.com/edw/home.html#/skills/list">https://developer.amazon.com/edw/home.html#/skills/list</a><br/><br/>
+        This will take you to a list of your personal developer skills. 
+        
+        
+        <h3><li>Create a new skill</li></h3>
+        Click the "Add a New Skill" button in the upper right. This should take you to a new page that prompts you to fill out a bunch of information about this new skill.
+        There are 6 tabs. We're going to go through them one at a time and fill them in. 
+        
+        
+        <h3><li>Fill in the "Skill Information" tab</li></h3>
+        It will assign you a random Application Id. Don't worry about it. This instance of this skill is entirely local to your account only.<br><br>
+        <table style="border: 1px solid black;">
+        	<tr>
+        		<td colspan="2" style="text-align:center; font-weight:bold;">Skill Information</td>
+        	</tr>
+        	<tr>
+        		<td><b>Name</b></td>
+        		<td>Responder</td>
+        	</tr>
+        	<tr>
+        		<td><b>Invocation Name</b></td>
+        		<td>Responder</td>
+        	</tr>
+        	<tr>
+        		<td><b>Version</b></td>
+        		<td>1.0</td>
+        	</tr>
+        	<tr>
+        		<td><b>Endpoint</b></td>
+        		<td>https://responder.derpgroup.com/responder</td>
+        	</tr>
+        </table><br>
+        Enter these values, then hit "Save".
+        
+        
+        <h3><li>Fill in the "Interaction Model" tab</li></h3>
+        We have two things to fill in here, the Intent Schema, and the Sample Utterances. There are no Custom Slot Types for this skill.<br><br>
+        <table style="border: 1px solid black;">
+        	<tr>
+        		<td colspan="2" style="text-align:center; font-weight:bold;">Interaction Model</td>
+        	</tr>
+        	<tr>
+        		<td><b>Intent Schema</b></td>
+        		<td><pre>{
+  "intents": [
+    {
+      "intent": "GETRESPONSE",
+      "slots": []
+    },
+    {
+      "intent": "WHATISMYID",
+      "slots": []
+    }
+  ]
+}</pre></td>
+        	</tr>
+        	<tr>
+        		<td><b>Sample Utterances</b></td>
+        		<td><pre>GETRESPONSE what is my response
+GETRESPONSE to get the response
+GETRESPONSE to get my response
+GETRESPONSE to give the response
+GETRESPONSE to give me my response
+GETRESPONSE to play the response
+GETRESPONSE to play my response
+GETRESPONSE to play
+GETRESPONSE to open the response
+GETRESPONSE to open my response
+GETRESPONSE to open
+WHATISMYID what is my id
+WHATISMYID give me my id
+WHATISMYID to give me my id</pre></td>
+        	</tr>
+        </table><br>
+        Enter those values, then hit "Save".
+        
+        
+        <h3><li>Fill in the "SSL Certificate" tab</li></h3>
+        There are 3 radio buttons on this tab. Select the "I will upload a self-signed certificate in X.509 format" option.
+        Then in the text box, copy paste this value:<br>
+        <pre style="width:515px; height:315px;background-color:black;color:green;padding:10px;">-----BEGIN CERTIFICATE-----
+MIIDajCCAlKgAwIBAgIJAPlr4mEqjRVSMA0GCSqGSIb3DQEBBQUAMFAxCzAJBgNV
+BAYTAlVTMQswCQYDVQQIEwJXQTEQMA4GA1UEBxMHU2VhdHRsZTETMBEGA1UEChMK
+REVSUCBHcm91cDENMAsGA1UEAxMEcXVpcDAeFw0xNTExMTQwMzQ2MjNaFw0xNjEx
+MTMwMzQ2MjNaMFAxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJXQTEQMA4GA1UEBxMH
+U2VhdHRsZTETMBEGA1UEChMKREVSUCBHcm91cDENMAsGA1UEAxMEcXVpcDCCASIw
+DQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALqvFaWBalQiQRGlahCP/iFjVNDY
+b71+nRa5tEo8g/f/C2K31fbdwTd99Hn6CpRq/wzsyC7BxCULEryM0mNW4FK/tP07
+NxyNTJtxxoooM42plNP44pFGVaek+uSP0kvJ9Iyml/r/9HJGstfQ8rp/qj/1sqpO
+caO151TK5tJ5ObfoyAZdetDZuIfg0At35zFjwrMMSjbCKTotoPqh+plaAWlX0qGs
+SirPvwlRdvqJa0rbZmE3Xi+zo+w9fVVu18xuhdArw0sRj+lQUQjWswJDMUokVn7x
+tmJUpR9KQkOTcQSyTDJNNmSywtDrhIEHUe3l3+3WJYgSeVwDHt3B32Qzj1UCAwEA
+AaNHMEUwCwYDVR0PBAQDAgQwMBMGA1UdJQQMMAoGCCsGAQUFBwMBMCEGA1UdEQQa
+MBiCFmRlYnVnZ2VyLmRlcnBncm91cC5jb20wDQYJKoZIhvcNAQEFBQADggEBAC5W
+BFfIsO46OEFIwulC8f84ZoEjSjUTD/tsmgkKdDZKg5xePwT30OuqJLNdNPjwWs1a
+9F3eYpEgGm/KIZe68ocrVILho+4OkpuCQxl/XJgSRxpCc/uUtjG3iLBiBfnj4Sm2
+xV7aMpotETPtV4EsO+jdEEwlI+5/iqYg1AesV/ZcFTaUYXsuG6/8Io03iGvfc4mW
+OdIRdr0mfbtwmiSksuLyY7Fzkii/iq0XUqOapn5ZqEjoMcxuzLHh4pjBRwbghrS1
+WLC4TKgbyRMxS6Nul4VmmyZ+qGMiXswI4yftSoH56uoNtsgtf+XMn7Cpt0zNLoVx
+pQ2M1EFnGVnCEZiVMWw=
+-----END CERTIFICATE-----</pre>
+Enter all those values, then hit "Save".
+        
+        
+        
+        <h3><li>You've finished setting up the skill</h3>
+        I told you it wouldn't be so bad. The remaining 3 tabs (Test, Description, and Publishing Information) don't require any input to get this skill working locally for you.<br>
+        </li>
+        </ol>
+        </div>
+        
+        
+        <br>
+        <h1>Using the skill</h1>
+        Alright, so now that you've successfully created the skill for your Amazon account, it's time to get started with mocking skill responses.
+		<ol>
+			<h3><li>Register your Echo</li></h3>
+			Activate the skill so the server will record your Echo ID and give it back to you. Talk to your Echo and activate the skill:<br><br>
+			<i>"Alexa, open Responder"</i><br><br>
+			It should then respond with your Echo ID, and a series of instructions on how to use it. Your Echo ID is a long string of characters that will look something like this <i><b>(amzn1.account.AGHHAR7UDOAACXW866H41KGZRZJP)</b></i>.
+			You will want to copy/paste it out of your Alexa App so you can use it later. Remember, if at any time you forget what your Echo ID is, you can always ask the skill<br><br>
+			<i>"Alexa, ask Responder what is my id?"</i><br>
+			
+			<h3><li>Register a Mock Response</li></h3>
+			To register a mock service response you need to POST a JSON payload to the following endpoint:<br><br>
+			<i>http://responder.derpgroup.com/responder/user/{yourEchoId}/</i><br><br>
+			For our example purposes this would look like:<br>
+			<i>http://responder.derpgroup.com/responder/user/amzn1.account.AGHHAR7UDOAACXW866H41KGZRZJP/</i><br><br>
+			The POST body needs to contain a JSON payload that Amazon can consume. Right now this means 
+			<a href="https://github.com/amzn/alexa-skills-kit-java/blob/master/src/com/amazon/speech/json/SpeechletResponseEnvelope.java">SpeechletResponseEnvelope</a> as defined in the Alexa Skills Kit.
+			Here is an example SpeechletResponseEnvelope:<br>
+			<pre style="background-color:black;color:green;padding:10px;">{
+  "version": null,
+  "response": {
+    "outputSpeech": {
+      "type": "SSML",
+      "id": null,
+      "ssml": "<speak>This is the verbal SSML that is played through the Echo speakers</speak>"
+    },
+    "card": {
+      "type": "Simple",
+      "title": "This is the text displayed visually in the Alexa App's title",
+      "content": "This is the text that is visually displayed in the Alexa app."
+    },
+    "reprompt": {
+      "outputSpeech": {
+        "type": "SSML",
+        "id": null,
+        "ssml": "<speak>This is the delayed verbal prompt read to the user</speak>"
+      }
+    },
+    "shouldEndSession": false
+  },
+  "sessionAttributes": null
+}</pre>
+		To send a POST request to the A.S.K. Responder skill, you'll need to use a program like Postman (Chrome plugin) or cURL.
+		<br>
+		<b>Note:</b> You must set the header "Content-Type" equal to "application/json" when sending the POST request.<br><br>
+		If it successfully registered your response it should repeat it back to you. To see what your current registered response is, you can use this endpoint:<br><br>
+		<i>GET http://responder.derpgroup.com/responder/user/{yourEchoId}/</i><br>
+
+		<h3><li>Getting the Echo to play your mock response</h3>
+		Simply access your response through your Echo:<br><br>
+		<i>"Alexa, ask Responder to play my response"</i><br><br>
+		This will then play your response directly through your Echo, exactly as if there was a skill on the back-end delivering your response as a reply.
+
+		</ol>
+		<br><br>
+		</div>
+    </body>
+</html>
