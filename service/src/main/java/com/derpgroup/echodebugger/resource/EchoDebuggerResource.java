@@ -43,7 +43,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.amazon.speech.json.SpeechletRequestEnvelope;
+import com.amazon.speech.json.SpeechletResponseEnvelope;
 import com.amazon.speech.speechlet.IntentRequest;
+import com.amazon.speech.speechlet.LaunchRequest;
+import com.amazon.speech.speechlet.SessionEndedRequest;
 import com.amazon.speech.speechlet.SpeechletException;
 import com.derpgroup.echodebugger.configuration.MainConfig;
 import com.derpgroup.echodebugger.logger.EchoDebuggerLogger;
@@ -176,17 +179,23 @@ public class EchoDebuggerResource {
 
   @POST
   public Object handleEchoRequest(SpeechletRequestEnvelope request) throws SpeechletException{
-    
+
     if (request==null || request.getRequest() == null) {
       throw new SpeechletException("Invalid Request format");
     }
 
-    String intent = "NOINTENT";
+    String intent = "UNKNOWN_INTENT";
     if(request.getRequest()!=null && request.getRequest() instanceof IntentRequest){
-        IntentRequest intentRequest = (IntentRequest) request.getRequest();
-        intent = intentRequest.getIntent().getName();
+      IntentRequest intentRequest = (IntentRequest) request.getRequest();
+      intent = intentRequest.getIntent().getName();
     }
-    
+    if(request.getRequest() instanceof LaunchRequest){
+      intent = "START_OF_CONVERSATION";
+    }
+    else if(request.getRequest() instanceof SessionEndedRequest){
+      intent = "END_OF_CONVERSATION";
+    }
+
     // If the user doesn't exist, create them
     String userId = request.getSession().getUser().getUserId();
     if(!userDao.containsUser(userId)){
@@ -196,7 +205,7 @@ public class EchoDebuggerResource {
     EchoDebuggerLogger.logEchoRequest(userId,intent);
 
     switch(intent){
-    case "NOINTENT":
+    case "START_OF_CONVERSATION":
       String noIntentContent = "Welcome to the Alexa Skills Kit Responder (A.S.K Responder). This is a basic tool that allows you to create mock skill responses, and then play them through your Echo. "
           + "To use this tool, there are four things you need to do:\n"
           
@@ -215,11 +224,11 @@ public class EchoDebuggerResource {
           + "For more detailed information on usage please visit "+baseUrl+"responder/";
 
       String noIntentSsml = "Welcome to the Alexa Skills Kit Responder. This is a basic tool that allows you to create mock skill responses, and then play them through your Echo. "
-          + "To use this tool, there are four things you need to do:<break/><break/>"
-          + "1.) You must set up this skill on your Echo - which you've already done.<break/>"
-          + "2.) You must get your Echo ID. You will upload your mock skill responses using this ID. Your ID is '"+userId+"'. Please refer to the Alexa app to see it. If at any time you forget your Echo ID you can ask me, 'What is my ID'<break/>"
-          + "3.) With that Echo ID you can now do an HTTP POST request to register your mock response. <break/>"
-          + "4.) You can then play your mock response through this skill itself, by saying: 'Play my response' <break/>"
+          + "To use this tool, there are four things you need to do. <break time=\"700ms\"/>"
+          + "The first thing you must do is set up this skill on your Echo - which you've already done.<break/>"
+          + "The second thing you must do, is get your Echo ID. You will upload your mock skill responses using this ID. Your ID is '"+userId+"'. Please refer to the Alexa app to see it. If at any time you forget your Echo ID you can ask me, What is my ID<break time=\"700ms\"/>"
+          + "Which brings us to the third thing. With that Echo ID you can now do an HTTP POST request to register your mock response. <break/>"
+          + "And lastly, you can then play your mock response through this skill itself, by saying: Play my response. <break time=\"700ms\"/>"
           + "Please read the additional information I've just printed in your Alexa app to help you do this.";
       return AlexaResponseUtil.createSimpleResponse("How to use the A.S.K. Responder",noIntentContent,noIntentSsml);
 
@@ -242,7 +251,7 @@ public class EchoDebuggerResource {
       return AlexaResponseUtil.createSimpleResponse(title,content,ssml);
       
     default:
-      throw new SpeechletException("Invalid Intent");
+      return new SpeechletResponseEnvelope();
     }
   }
 
