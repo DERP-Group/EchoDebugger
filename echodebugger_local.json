@@ -5,8 +5,7 @@
     "debugMode":true,
     "contentFile":"/var/lib/echodebugger/users.json",
     "saveRate":60,
-    "baseUrl":"http://responder.derpgroup.com/",
-    "introPage":"/var/lib/echodebugger/intro.html"
+    "baseUrl":"http://responder.derpgroup.com/"
   },
   "server": {
     "applicationConnectors": [

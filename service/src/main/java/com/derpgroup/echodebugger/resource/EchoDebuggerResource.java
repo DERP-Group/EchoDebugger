@@ -20,10 +20,6 @@
 
 package com.derpgroup.echodebugger.resource;
 
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -74,27 +70,12 @@ public class EchoDebuggerResource {
   private Integer maxAllowedResponseLength;
   private Boolean debugMode;
   private String baseUrl;
-  private String introPage;
 
   public EchoDebuggerResource(MainConfig config, Environment env) {
     password = config.getEchoDebuggerConfig().getPassword();
     maxAllowedResponseLength = config.getEchoDebuggerConfig().getMaxAllowedResponseLength();
     debugMode = config.getEchoDebuggerConfig().getDebugMode();
     baseUrl = config.getEchoDebuggerConfig().getBaseUrl();
-    introPage = config.getEchoDebuggerConfig().getIntroPage();
-  }
-  
-  @Produces(MediaType.TEXT_HTML)
-  @GET
-  public String getRootRequest(){
-    String content;
-    try {
-      content = new String(Files.readAllBytes(Paths.get(introPage)),Charset.defaultCharset());
-    } catch (IOException e) {
-      LOG.error("There was a problem serving the intro page",e);
-      content = "There was a problem. Please refer to the blog posts at www.derpgroup.com for more information.";
-    }
-    return content;
   }
   
   @Path("/user/{echoId}")
@@ -226,7 +207,7 @@ public class EchoDebuggerResource {
       String noIntentSsml = "Welcome to the Alexa Skills Kit Responder. This is a basic tool that allows you to create mock skill responses, and then play them through your Echo. "
           + "To use this tool, there are four things you need to do. <break time=\"700ms\"/>"
           + "The first thing you must do is set up this skill on your Echo - which you've already done.<break/>"
-          + "The second thing you must do, is get your Echo ID. You will upload your mock skill responses using this ID. Your ID is '"+userId+"'. Please refer to the Alexa app to see it. If at any time you forget your Echo ID you can ask me, What is my ID<break time=\"700ms\"/>"
+          + "The second thing you must do, is get your Echo ID. Your ID is a very long unpronouncable string of characters. I have just printed it in the Alexa App. Please refer to the Alexa app to see it. You will upload your mock skill responses using this ID. If at any time you forget your Echo ID you can ask me, What is my ID<break time=\"700ms\"/>"
           + "Which brings us to the third thing. With that Echo ID you can now do an HTTP POST request to register your mock response. <break/>"
           + "And lastly, you can then play your mock response through this skill itself, by saying: Play my response. <break time=\"700ms\"/>"
           + "Please read the additional information I've just printed in your Alexa app to help you do this.";
@@ -247,7 +228,7 @@ public class EchoDebuggerResource {
     case "WHATISMYID":
       String title = "Echo ID";
       String content = "Your Echo ID is "+request.getSession().getUser().getUserId();
-      String ssml = "Your Echo ID is "+request.getSession().getUser().getUserId()+" <break /> Please check your Alexa app to see the exact spelling. It is case-sensitive. This ID is unique between you and this skill. If you delete the skill you will be issued a new ID when you next connect.";
+      String ssml = "Your Echo ID is now printed in the Alexa app. Please check to see the exact spelling. It is case-sensitive. This ID is unique between you and this skill. If you delete the skill you will be issued a new ID when you next connect.";
       return AlexaResponseUtil.createSimpleResponse(title,content,ssml);
       
     default:
