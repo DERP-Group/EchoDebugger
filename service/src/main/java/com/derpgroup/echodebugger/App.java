@@ -31,6 +31,7 @@ import com.derpgroup.echodebugger.health.BasicHealthCheck;
 import com.derpgroup.echodebugger.jobs.UserDaoLocalImplThread;
 import com.derpgroup.echodebugger.model.UserDaoLocalImpl;
 import com.derpgroup.echodebugger.resource.EchoDebuggerResource;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
@@ -47,7 +48,9 @@ public class App extends Application<MainConfig> {
   }
 
   @Override
-  public void initialize(Bootstrap<MainConfig> bootstrap) {}
+  public void initialize(Bootstrap<MainConfig> bootstrap) {
+    bootstrap.getObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+  }
 
   @Override
   public void run(MainConfig config, Environment environment) throws IOException {

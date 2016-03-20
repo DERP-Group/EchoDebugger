@@ -77,12 +77,12 @@ public class EchoDebuggerResource {
     debugMode = config.getEchoDebuggerConfig().getDebugMode();
     baseUrl = config.getEchoDebuggerConfig().getBaseUrl();
   }
-  
+
   @Path("/user/{echoId}")
   @POST
   public Map<String, Object> saveResponseForEchoId(Map<String, Object> body, @PathParam("echoId") String echoId){
     User user = userDao.getUser(echoId);
-    
+
     // If the request is for an ID that we haven't seen before, refuse it
     if(user == null){
       if(debugMode){
@@ -100,10 +100,10 @@ public class EchoDebuggerResource {
     else{
       EchoDebuggerLogger.logSaveNewResponse(body, echoId, true);
     }
-    
+
     user.setLastUploadTime(Instant.now());
     user.setNumContentUploads(user.getNumContentUploads()+1);
-    
+
     // Abort storing it if the request is too long
     int responseLength = getLengthOfContent(body);
     user.setNumCharactersUploaded(user.getNumCharactersUploaded()+responseLength);
@@ -118,7 +118,7 @@ public class EchoDebuggerResource {
     userDao.saveUser(user);
     return body;
   }
-  
+
   @Path("/user/{echoId}")
   @GET
   public Map<String, Object> getResponseForEchoId(@PathParam("echoId") String echoId){
@@ -135,16 +135,16 @@ public class EchoDebuggerResource {
     int responseLength = getLengthOfContent(user.getData());
     user.setNumCharactersDownloaded(user.getNumCharactersDownloaded()+responseLength);
     userDao.saveUser(user);
-    
+
     if(user.getData()==null){
       Map<String, Object> response = new HashMap<String, Object>();
       response.put("Result", "There are no responses stored for user ("+echoId+")");
       return response;
     }
-    
+
     return user.getData();
   }
-  
+
   @Path("/user")
   @GET
   public Object getAllResponses(@QueryParam("p") String p){
@@ -179,58 +179,30 @@ public class EchoDebuggerResource {
 
     // If the user doesn't exist, create them
     String userId = request.getSession().getUser().getUserId();
-    if(!userDao.containsUser(userId)){
+    boolean isNewUser = !userDao.containsUser(userId);
+    if(isNewUser){
       userDao.createUser(userId);
+      return getIntro(userId);
     }
     User user = userDao.getUser(userId);
     EchoDebuggerLogger.logEchoRequest(userId,intent);
 
     switch(intent){
     case "START_OF_CONVERSATION":
-      String noIntentContent = "Welcome to the Alexa Skills Kit Responder (A.S.K Responder). This is a basic tool that allows you to create mock skill responses, and then play them through your Echo. "
-          + "To use this tool, there are four things you need to do:\n"
-          
-          + "1.) Set up the A.S.K. Responder skill\n"
-          + " You've already done this - else you wouldn't be seeing this. Please verify that your Intent Schema and Sample Utterances match the expected values. See this webpage for further information: "+baseUrl+"responder/\n"
-          
-          + "2.) Get your Echo ID\n"
-          + " Your Echo ID is '"+userId+"'. You will upload your mock skill responses using this ID. If at any time you forget your Echo ID you can ask, 'What is my ID?'\n"
-          
-          + "3.) Upload your mock skill response\n"
-          + " You can register your mock response by doing an HTTP POST request to:\n"+baseUrl+"responder/user/"+userId+"/\n"
-          + " Please note: The Responder is expecting the request body to be a JSON payload, and it expects the content header 'Content-Type' to be 'application/json'. Set this value in your POST request else it won't work.\n"
-          
-          + "4.) Play your response\n"
-          + "Play your mock skill response through the A.S.K. Responder itself (this skill), by saying: 'Play my response'\n"
-          + "For more detailed information on usage please visit "+baseUrl+"responder/";
+      return getUserContent(user);
 
-      String noIntentSsml = "Welcome to the Alexa Skills Kit Responder. This is a basic tool that allows you to create mock skill responses, and then play them through your Echo. "
-          + "To use this tool, there are four things you need to do. <break time=\"700ms\"/>"
-          + "The first thing you must do is set up this skill on your Echo - which you've already done.<break/>"
-          + "The second thing you must do, is get your Echo ID. Your ID is a very long unpronouncable string of characters. I have just printed it in the Alexa App. Please refer to the Alexa app to see it. You will upload your mock skill responses using this ID. If at any time you forget your Echo ID you can ask me, What is my ID<break time=\"700ms\"/>"
-          + "Which brings us to the third thing. With that Echo ID you can now do an HTTP POST request to register your mock response. <break/>"
-          + "And lastly, you can then play your mock response through this skill itself, by saying: Play my response. <break time=\"700ms\"/>"
-          + "Please read the additional information I've just printed in your Alexa app to help you do this.";
-      return AlexaResponseUtil.createSimpleResponse("How to use the A.S.K. Responder",noIntentContent,noIntentSsml);
+    case "AMAZON.HelpIntent":
+      return getIntro(userId);
 
     case "GETRESPONSE":
-      user.setNumContentDownloads(user.getNumContentDownloads()+1);
-      user.setLastEchoDownloadTime(Instant.now());
-      int contentLength = getLengthOfContent(user.getData());
-      user.setNumCharactersDownloaded(user.getNumCharactersDownloaded() + contentLength);
-      userDao.saveUser(user);
-      
-      if(user.getData()==null){
-        return AlexaResponseUtil.createSimpleResponse("You have no saved responses","There are no saved responses for your Echo ID ("+userId+")","There are no saved responses");
-      }
-      return user.getData();
-      
+      return getUserContent(user);
+
     case "WHATISMYID":
       String title = "Echo ID";
       String content = "Your Echo ID is "+request.getSession().getUser().getUserId();
       String ssml = "Your Echo ID is now printed in the Alexa app. Please check to see the exact spelling. It is case-sensitive. This ID is unique between you and this skill. If you delete the skill you will be issued a new ID when you next connect.";
       return AlexaResponseUtil.createSimpleResponse(title,content,ssml);
-      
+
     default:
       return new SpeechletResponseEnvelope();
     }
@@ -238,6 +210,36 @@ public class EchoDebuggerResource {
 
   public UserDao getUserDao() {return userDao;}
   public void setUserDao(UserDao userDao) {this.userDao = userDao;}
+  
+  public Object getUserContent(User user){
+    user.setNumContentDownloads(user.getNumContentDownloads()+1);
+    user.setLastEchoDownloadTime(Instant.now());
+    int contentLength = getLengthOfContent(user.getData());
+    user.setNumCharactersDownloaded(user.getNumCharactersDownloaded() + contentLength);
+    userDao.saveUser(user);
+
+    if(user.getData()==null){
+      return AlexaResponseUtil.createSimpleResponse("You have no saved responses","There are no saved responses for your Echo ID ("+user.getEchoId()+")","There are no saved responses");
+    }
+    return user.getData();
+  }
+  
+  public Object getIntro(String userId){
+    String plaintext = "Welcome to the Alexa Skills Kit Responder. This is a basic tool that allows you to create mock skill responses, and then play them through your Echo. "
+        + "You'll need your Echo ID to upload mock responses. I have just printed it below for you. To print your Echo ID again you can just say, \"Alexa, ask Responder, what is my ID?\" "
+        + "With that Echo ID you can upload your mock response using an HTTP POST request.\n"
+        + "To play your response just say \"Alexa, open Responder.\" To hear these instructions again say, \"Alexa, ask Responder for help.\" For details, follow the documentation link listed below.\n"
+        + "Your Echo ID is: "+userId+"\n"
+        + "Documentation: "+baseUrl+"responder/";
+
+    String ssml = "Welcome to the Alexa Skills Kit Responder. This is a basic tool that allows you to create mock skill responses, and then play them through your Echo. <break time=\"700ms\"/>"
+        + "You'll need your Echo ID to upload mock responses. I have just printed it in the Alexa App for you. To print your Echo ID again you can just say, Alexa, ask Responder, what is my ID<break time=\"700ms\"/>"
+        + "With that Echo ID you can upload your mock response using an HTTP POST request. <break/>"
+        + "To play your response just say <break/> Alexa, open Responder<break time=\"700ms\"/>"
+        + "To hear these instructions again, say, Alexa, ask Responder for help. "
+        + "For details, follow the documentation link that I've just printed in your Alexa app.";
+    return AlexaResponseUtil.createSimpleResponse("How to use the A.S.K. Responder",plaintext,ssml);
+  }
 
   public int getLengthOfContent(Map<String, Object> content){
     if(content == null){return 0;}
