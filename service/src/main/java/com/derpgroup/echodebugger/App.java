@@ -28,7 +28,10 @@ import java.io.IOException;
 
 import com.derpgroup.echodebugger.configuration.MainConfig;
 import com.derpgroup.echodebugger.health.BasicHealthCheck;
+import com.derpgroup.echodebugger.jobs.UserDaoLocalImplThread;
+import com.derpgroup.echodebugger.model.UserDaoLocalImpl;
 import com.derpgroup.echodebugger.resource.EchoDebuggerResource;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
@@ -45,7 +48,9 @@ public class App extends Application<MainConfig> {
   }
 
   @Override
-  public void initialize(Bootstrap<MainConfig> bootstrap) {}
+  public void initialize(Bootstrap<MainConfig> bootstrap) {
+    bootstrap.getObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+  }
 
   @Override
   public void run(MainConfig config, Environment environment) throws IOException {
@@ -57,7 +62,18 @@ public class App extends Application<MainConfig> {
     // Health checks
     environment.healthChecks().register("basics", new BasicHealthCheck(config, environment));
 
+    // Load up the content
+    UserDaoLocalImpl userDao = new UserDaoLocalImpl(config, environment);
+    userDao.initialize();
+    
+    // Build the helper thread that saves data every X minutes
+    UserDaoLocalImplThread userThread = new UserDaoLocalImplThread(config, userDao);
+    userThread.start();
+    
+    EchoDebuggerResource debuggerResource = new EchoDebuggerResource(config, environment);
+    debuggerResource.setUserDao(userDao);
+    
     // Resources
-    environment.jersey().register(new EchoDebuggerResource(config, environment));
+    environment.jersey().register(debuggerResource);
   }
 }
