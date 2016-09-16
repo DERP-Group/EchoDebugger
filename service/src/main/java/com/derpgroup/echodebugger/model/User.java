@@ -3,6 +3,10 @@ package com.derpgroup.echodebugger.model;
 import java.time.Instant;
 import java.util.Map;
 
+import com.derpgroup.echodebugger.util.InstantDeserializer;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+
 public class User {
 
   private String echoId;
@@ -11,9 +15,18 @@ public class User {
   private int numContentDownloads;
   private int numCharactersUploaded;
   private int numCharactersDownloaded;
+  
+  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "PST")
+  @JsonDeserialize(using = InstantDeserializer.class)
   private Instant creationTime;
+  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "PST")
+  @JsonDeserialize(using = InstantDeserializer.class)
   private Instant lastUploadTime;
+  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "PST")
+  @JsonDeserialize(using = InstantDeserializer.class)
   private Instant lastWebDownloadTime;
+  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "PST")
+  @JsonDeserialize(using = InstantDeserializer.class)
   private Instant lastEchoDownloadTime;
   private int numUploadsTooLarge;
   

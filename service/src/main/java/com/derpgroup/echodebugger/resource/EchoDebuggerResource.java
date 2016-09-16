@@ -21,7 +21,9 @@
 package com.derpgroup.echodebugger.resource;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import io.dropwizard.setup.Environment;
@@ -55,6 +57,7 @@ import com.derpgroup.echodebugger.logger.EchoDebuggerLogger;
 import com.derpgroup.echodebugger.model.User;
 import com.derpgroup.echodebugger.model.UserDao;
 import com.derpgroup.echodebugger.util.AlexaResponseUtil;
+import com.derpgroup.echodebugger.util.UserSorter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -195,7 +198,9 @@ public class EchoDebuggerResource {
       return response;
     }
     EchoDebuggerLogger.logAccessRequest("ROOT","ALL_RESPONSES,p="+p,true);
-    return userDao.getAllUserData();
+    List<User> users = userDao.getAllUserData();
+    Collections.sort(users, UserSorter.SORT_USER_BY_MOST_RECENT_UPLOAD);
+    return users;
   }
 
   @POST

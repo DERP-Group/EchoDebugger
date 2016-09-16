@@ -34,6 +34,7 @@ import com.derpgroup.echodebugger.resource.EchoDebuggerResource;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 /**
  * Main method for spinning up the HTTP server.
@@ -57,6 +58,9 @@ public class App extends Application<MainConfig> {
     if (config.isPrettyPrint()) {
       ObjectMapper mapper = environment.getObjectMapper();
       mapper.enable(SerializationFeature.INDENT_OUTPUT);
+      mapper.registerModule(new JavaTimeModule());
+      mapper.configure( SerializationFeature.WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS, false );
+      mapper.configure( SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false );
     }
 
     // Health checks
