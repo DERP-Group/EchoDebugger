@@ -24,6 +24,18 @@ POST /echodebugger/user/{echoId}/
 }
 ```
 
+## Posting a response to your Echo with just the plainText response to speak
+```
+POST /echodebugger/user/{echoId}/plainText
+This is some plain text for the echo to speak
+```
+
+## Posting a response to your Echo with a Ssml response to speak
+```
+POST /echodebugger/user/{echoId}/plainText
+<speak><p>This is some plain text,<break /> the echo should interpret it properly</p></speak>
+```
+
 ## Getting your current response
 `
 GET /echodebugger/user/{echoId}/

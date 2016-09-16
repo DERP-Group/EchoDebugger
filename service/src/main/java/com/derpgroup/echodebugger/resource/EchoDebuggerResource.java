@@ -35,6 +35,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
+import jersey.repackaged.com.google.common.collect.ImmutableMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +46,10 @@ import com.amazon.speech.speechlet.IntentRequest;
 import com.amazon.speech.speechlet.LaunchRequest;
 import com.amazon.speech.speechlet.SessionEndedRequest;
 import com.amazon.speech.speechlet.SpeechletException;
+import com.amazon.speech.speechlet.SpeechletResponse;
+import com.amazon.speech.ui.PlainTextOutputSpeech;
+import com.amazon.speech.ui.SimpleCard;
+import com.amazon.speech.ui.SsmlOutputSpeech;
 import com.derpgroup.echodebugger.configuration.MainConfig;
 import com.derpgroup.echodebugger.logger.EchoDebuggerLogger;
 import com.derpgroup.echodebugger.model.User;
@@ -61,7 +67,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 @Path("/responder")
 @Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
+@Consumes({MediaType.APPLICATION_JSON,MediaType.TEXT_PLAIN})
 public class EchoDebuggerResource {
   final static Logger LOG = LoggerFactory.getLogger(EchoDebuggerResource.class);
 
@@ -118,7 +124,41 @@ public class EchoDebuggerResource {
     userDao.saveUser(user);
     return body;
   }
+  
+  @Path("/user/{echoId}/plainText")
+  @POST
+  public Map<String,Object> savePlainTextResponseForEchoId(String body, @PathParam("echoId") String echoId){	  
+	  PlainTextOutputSpeech plainTextOutputSpeech = new PlainTextOutputSpeech();
+	  plainTextOutputSpeech.setText(body);
+	  
+	  SimpleCard card = new SimpleCard();
+	  card.setContent(body);
+	  card.setTitle(body);
 
+	  SpeechletResponse response = new SpeechletResponse();
+	  response.setCard(card);
+	  response.setOutputSpeech(plainTextOutputSpeech);
+	  response.setShouldEndSession(true);
+	  return saveResponseForEchoId(ImmutableMap.of("response",response), echoId);
+  }
+  
+  @Path("/user/{echoId}/ssml")
+  @POST
+  public Map<String,Object> saveSsmlResponseForEchoId(String body, @PathParam("echoId") String echoId){	  
+	  SsmlOutputSpeech plainTextOutputSpeech = new SsmlOutputSpeech();
+	  plainTextOutputSpeech.setSsml(body);
+	  
+	  SimpleCard card = new SimpleCard();
+	  card.setContent(body);
+	  card.setTitle(body);
+
+	  SpeechletResponse response = new SpeechletResponse();
+	  response.setCard(card);
+	  response.setOutputSpeech(plainTextOutputSpeech);
+	  response.setShouldEndSession(true);
+	  return saveResponseForEchoId(ImmutableMap.of("response",response), echoId);
+  }
+  
   @Path("/user/{echoId}")
   @GET
   public Map<String, Object> getResponseForEchoId(@PathParam("echoId") String echoId){
