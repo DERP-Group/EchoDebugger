@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.io.FileUtils;
@@ -48,9 +49,12 @@ public class UserDaoLocalImpl implements UserDao{
       List<User> userList = readUsersFromFile(contentFile);
       for(User user : userList){
         users.put(user.getEchoId(), user);
-        if(user.getId() != null){
-          mapOfIdToUserId.put(user.getId().toString(), user.getEchoId());
+
+        // Backwards compatible change to upgrade current users to the new ID
+        if(user.getId() == null){
+          user.setId(UUID.randomUUID());
         }
+        mapOfIdToUserId.put(user.getId().toString(), user.getEchoId());
       }
       initialized = true;
     } catch (IOException e) {
