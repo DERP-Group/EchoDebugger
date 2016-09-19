@@ -11,9 +11,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +28,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 public class UserDaoLocalImpl implements UserDao{
   private final Logger LOG = LoggerFactory.getLogger(UserDaoLocalImpl.class);
 
+  private Map<String,String> mapOfIdToUserId = new ConcurrentHashMap<>();
   private Map<String,User> users = new ConcurrentHashMap<String,User>();
   private String contentFile;
   private Boolean initialized = false;
@@ -46,6 +49,12 @@ public class UserDaoLocalImpl implements UserDao{
       List<User> userList = readUsersFromFile(contentFile);
       for(User user : userList){
         users.put(user.getEchoId(), user);
+
+        // Backwards compatible change to upgrade current users to the new ID
+        if(user.getId() == null){
+          user.setId(UUID.randomUUID());
+        }
+        mapOfIdToUserId.put(user.getId().toString(), user.getEchoId());
       }
       initialized = true;
     } catch (IOException e) {
@@ -57,10 +66,19 @@ public class UserDaoLocalImpl implements UserDao{
     return initialized;
   }
 
-  public Boolean createUser(String userId){
-    if(containsUser(userId)){return true;}
-    users.put(userId, new User(userId));
-    return true;
+  public User createUser(String echoId){
+    User user = users.get(echoId);
+    if(user != null){
+      // TODO: Consider an exception here. We shouldn't be trying to create a user where one exists
+      return user;
+    }
+    
+    user = new User(echoId);
+    users.put(echoId, user);
+    if(user.getId() != null){
+      mapOfIdToUserId.put(user.getId().toString(), echoId);
+    }
+    return user;
   }
   
   public Boolean saveUser(User user){
@@ -68,12 +86,14 @@ public class UserDaoLocalImpl implements UserDao{
     return true;
   }
 
-  public Boolean containsUser(String userId){
-    return users.containsKey(userId);
+  public User getUserById(String id){
+    String echoId = mapOfIdToUserId.get(id);
+    if(StringUtils.isEmpty(echoId)){return null;}
+    return getUserByEchoId(echoId);
   }
 
-  public User getUser(String userId){
-    return users.get(userId);
+  public User getUserByEchoId(String echoId){
+    return users.get(echoId);
   }
 
   public List<User> getAllUserData() {

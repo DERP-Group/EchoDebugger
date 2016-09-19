@@ -2,11 +2,13 @@ package com.derpgroup.echodebugger.model;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 public class User {
 
+  private UUID id;
   private String echoId;
   private Map<String, Object> data;
   private int numContentUploads;
@@ -27,9 +29,12 @@ public class User {
   public User(){}
   public User(String echoId){
     this.echoId = echoId;
+    this.id = UUID.randomUUID();
     creationTime = Instant.now();
   }
   
+  public UUID getId() {return id;}
+  public void setId(UUID id) {this.id = id;}
   public String getEchoId() {return echoId;}
   public void setEchoId(String echoId) {this.echoId = echoId;}
   public Map<String, Object> getData() {return data;}

@@ -9,30 +9,30 @@ public interface UserDao {
   public Boolean isInitialized();
   
   /**
-   * Creates a user if they don't already exist
-   * @param userId
+   * Creates a user
+   * @param echoId
    */
-  public Boolean createUser(String userId);
+  public User createUser(String echoId);
   
   /**
    * Saves a user
    * @param userId
    */
   public Boolean saveUser(User user);
-  
-  /**
-   * Returns a true/false indicating if we have an account for the id
-   * @param userId
-   * @return
-   */
-  public Boolean containsUser(String userId);
 
   /**
-   * Returns the user account associated with this id. Null if it doesn't exist.
-   * @param userId
+   * Returns the user account associated with this echoId. Returns null if it doesn't exist.
+   * @param echoId
    * @return
    */
-  public User getUser(String userId);
+  public User getUserByEchoId(String echoId);
+
+  /**
+   * Returns the user account associated with this id. Returns null if it doesn't exist.
+   * @param uuid
+   * @return
+   */
+  public User getUserById(String id);
 
   /**
    * Gets all data from all users
