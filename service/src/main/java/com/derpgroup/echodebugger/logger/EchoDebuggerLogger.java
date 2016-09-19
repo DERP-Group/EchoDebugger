@@ -13,7 +13,6 @@ public class EchoDebuggerLogger {
   
   /**
    * Primary metrics logging function. Logs a user request and associated metadata.
-   * @param serviceInput
    */
   public static void logSaveNewResponse(Map<String, Object> postBody, String echoId, boolean legal){
     ObjectMapper mapper = new ObjectMapper();
