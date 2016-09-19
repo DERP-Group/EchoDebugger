@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 public class User {
 
   private UUID id;
@@ -13,9 +15,14 @@ public class User {
   private int numContentDownloads;
   private int numCharactersUploaded;
   private int numCharactersDownloaded;
+  
+  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "PST")
   private Instant creationTime;
+  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "PST")
   private Instant lastUploadTime;
+  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "PST")
   private Instant lastWebDownloadTime;
+  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "PST")
   private Instant lastEchoDownloadTime;
   private int numUploadsTooLarge;
   

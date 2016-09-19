@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import com.derpgroup.echodebugger.configuration.MainConfig;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 public class UserDaoLocalImpl implements UserDao{
@@ -30,9 +31,13 @@ public class UserDaoLocalImpl implements UserDao{
   private Map<String,User> users = new ConcurrentHashMap<String,User>();
   private String contentFile;
   private Boolean initialized = false;
+  private ObjectMapper mapper;
 
   public UserDaoLocalImpl(MainConfig config, Environment env){
     contentFile = config.getEchoDebuggerConfig().getContentFile();
+    mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    mapper.configure( SerializationFeature.WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS, false );
+    mapper.configure( SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false );
   }
   
   /**
@@ -106,7 +111,6 @@ public class UserDaoLocalImpl implements UserDao{
     }
 
     String content = new String(Files.readAllBytes(Paths.get(fileName)),Charset.defaultCharset());
-    ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
     return mapper.readValue(content, new TypeReference<List<User>>(){});
   }
 
@@ -124,8 +128,6 @@ public class UserDaoLocalImpl implements UserDao{
     if(file.createNewFile()){
       LOG.info("Created new user data file for use");
     }
-
-    ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
     String content = mapper.writeValueAsString(userList);
 
     FileUtils.writeStringToFile(file, content, Charset.defaultCharset());
