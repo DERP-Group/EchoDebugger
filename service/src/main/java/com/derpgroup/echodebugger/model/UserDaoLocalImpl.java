@@ -50,17 +50,6 @@ public class UserDaoLocalImpl implements UserDao{
 			for(User user : userList){
 				users.put(user.getEchoId(), user);
 				mapOfIdToUserId.put(user.getId().toString(), user.getEchoId());
-
-				// Backwards compatible change to upgrade users to the new Response storage format
-				if(user.getData() != null){
-					ResponseKey responseKey = new ResponseKey();
-					Response response = new Response(user.getData());
-
-					ResponseGroup responseGroup = new ResponseGroup(responseKey, response);
-					user.getResponseGroups().add(responseGroup);
-
-					user.setData(null);
-				}
 			}
 			initialized = true;
 		} catch (IOException e) {

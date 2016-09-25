@@ -85,7 +85,13 @@ public class EchoDebuggerResource {
 		baseUrl = config.getEchoDebuggerConfig().getBaseUrl();
 	}
 
-	@Path("/user/{userId}")
+	/**
+	 * This is the primary endpoint used for saving responses
+	 * @param body
+	 * @param userId
+	 * @return
+	 */
+	@Path("/users/{userId}")
 	@POST
 	public Map<String, Object> saveResponseForUserId(Map<String, Object> body, @PathParam("userId") String userId){
 		User user = userDao.getUserById(userId);
@@ -140,8 +146,22 @@ public class EchoDebuggerResource {
 		return body;
 	}
 
-	// TODO: Change this endpoint to be a UI manipulatable through a webpage
+	// Deprecate this, we want to move users away from it
 	@Path("/user/{userId}")
+	@POST
+	public Map<String, Object> saveResponseForUserId_old(Map<String, Object> body, @PathParam("userId") String userId){
+		return saveResponseForUserId(body, userId);
+	}
+
+	// Deprecate this
+	@Path("/user/{userId}")
+	@GET
+	public Map<String, Object> getResponseForEchoId_old(@PathParam("userId") String userId){
+		return getResponseForEchoId(userId);
+	}
+
+	// TODO: Change this endpoint to be a UI manipulatable through a webpage
+	@Path("/users/{userId}")
 	@GET
 	public Map<String, Object> getResponseForEchoId(@PathParam("userId") String userId){
 		User user = userDao.getUserById(userId);
@@ -183,13 +203,13 @@ public class EchoDebuggerResource {
 		return response;
 	}
 
-	@Path("/user")
+	@Path("/users")
 	@GET
 	public Object getAllResponses(@QueryParam("p") String p){
 		if(p==null || !p.equals(password)){
 			EchoDebuggerLogger.logAccessRequest("ROOT","ALL_RESPONSES,p="+p,false);
 			Map<String, Object> response = new HashMap<String, Object>();
-			response.put("Result", "To retrieve your response please use the format /responder/user/{yourEchoId}");
+			response.put("Result", "To retrieve your response please use the format /responder/users/{yourId}");
 			return response;
 		}
 		EchoDebuggerLogger.logAccessRequest("ROOT","ALL_RESPONSES,p="+p,true);
@@ -198,6 +218,20 @@ public class EchoDebuggerResource {
 		return users;
 	}
 
+	// Deprecate this
+	@Path("/user")
+	@GET
+	public Object getAllResponses_old(@QueryParam("p") String p){
+		return getAllResponses(p);
+	}
+
+	/**
+	 * This is the primary entry point for Echo requests made by Amazon.
+	 * Anything that returns from here is what gets played through your Echo.
+	 * @param request
+	 * @return
+	 * @throws SpeechletException
+	 */
 	@POST
 	public Object handleEchoRequest(SpeechletRequestEnvelope request) throws SpeechletException{
 
