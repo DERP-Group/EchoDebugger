@@ -2,22 +2,28 @@ package com.derpgroup.echodebugger.model;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 public class User {
 
 	private UUID id;
 	private String echoId;
 	private List<ResponseGroup> responseGroups = new ArrayList<ResponseGroup>();
-	private Map<String, Object> data;
+	@JsonIgnore
+	private Map<String, ResponseGroup> data = new HashMap<>();	// This only stores a runtime mapping of the responses
+	@JsonIgnore
+	private Map<Integer, ResponseGroup> mapOfResponseGroupsById = new HashMap<>();	// This only stores a runtime mapping of the responses
 	private int numContentUploads;
 	private int numContentDownloads;
 	private int numCharactersUploaded;
 	private int numCharactersDownloaded;
+	private int nextResponseGroupId = 0;
 
 	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "PST")
 	private Instant creationTime;
@@ -42,8 +48,10 @@ public class User {
 	public void setEchoId(String echoId) {this.echoId = echoId;}
 	public List<ResponseGroup> getResponseGroups() {return responseGroups;}
 	public void setResponseGroups(List<ResponseGroup> responseGroups) {this.responseGroups = responseGroups;}
-	public Map<String, Object> getData() {return data;}
-	public void setData(Map<String, Object> data) {this.data = data;}
+	public Map<String, ResponseGroup> getData() {return data;}
+	public void setData(Map<String, ResponseGroup> data) {this.data = data;}
+	public Map<Integer, ResponseGroup> getMapOfResponseGroupsById() {return mapOfResponseGroupsById;}
+	public void setMapOfResponseGroupsById(Map<Integer, ResponseGroup> mapOfResponseGroupsById) {this.mapOfResponseGroupsById = mapOfResponseGroupsById;}
 	public int getNumContentUploads() {return numContentUploads;}
 	public void setNumContentUploads(int numContentUploads) {this.numContentUploads = numContentUploads;}
 	public int getNumContentDownloads() {return numContentDownloads;}
@@ -52,6 +60,8 @@ public class User {
 	public void setNumCharactersUploaded(int numCharactersUploaded) {this.numCharactersUploaded = numCharactersUploaded;}
 	public int getNumCharactersDownloaded() {return numCharactersDownloaded;}
 	public void setNumCharactersDownloaded(int numCharactersDownloaded) {this.numCharactersDownloaded = numCharactersDownloaded;}
+	public int getNextResponseGroupId() {return nextResponseGroupId;}
+	public void setNextResponseGroupId(int nextResponseGroupId) {this.nextResponseGroupId = nextResponseGroupId;}
 	public Instant getCreationTime() {return creationTime;}
 	public void setCreationTime(Instant creationTime) {this.creationTime = creationTime;}
 	public Instant getLastUploadTime() {return lastUploadTime;}

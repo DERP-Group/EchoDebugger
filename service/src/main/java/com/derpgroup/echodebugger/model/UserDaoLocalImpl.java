@@ -8,17 +8,19 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.derpgroup.echodebugger.configuration.MainConfig;
+import com.derpgroup.echodebugger.util.UserUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -27,8 +29,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 public class UserDaoLocalImpl implements UserDao{
 	private final Logger LOG = LoggerFactory.getLogger(UserDaoLocalImpl.class);
 
-	private Map<String,String> mapOfIdToUserId = new ConcurrentHashMap<>();
-	private Map<String,User> users = new ConcurrentHashMap<String,User>();
+	private Map<String,String> mapOfIdToUserId = new HashMap<>();
+	private Map<String,User> mapOfUsersByEchoId = new HashMap<>();
 	private String contentFile;
 	private Boolean initialized = false;
 	private ObjectMapper mapper;
@@ -48,8 +50,37 @@ public class UserDaoLocalImpl implements UserDao{
 		try {
 			List<User> userList = readUsersFromFile(contentFile);
 			for(User user : userList){
-				users.put(user.getEchoId(), user);
+				mapOfUsersByEchoId.put(user.getEchoId(), user);
 				mapOfIdToUserId.put(user.getId().toString(), user.getEchoId());
+
+				// Backwards compatible changes
+				List<ResponseGroup> responseGroups = user.getResponseGroups();
+				if(CollectionUtils.isNotEmpty(responseGroups)){
+					for(ResponseGroup group : responseGroups){
+						if(user.getNextResponseGroupId() == 0){
+							user.setNextResponseGroupId(1);
+						}
+						List<Response> responses = group.getResponses();
+						if(CollectionUtils.isNotEmpty(responses)){
+							if(group.getNextResponseId() == 0){
+								group.setNextResponseId(1);
+							}
+							for(Response response : responses){
+								String responseId = response.getId();
+								Integer id = 0;
+								try{
+									id = Integer.parseInt(responseId);
+								}
+								catch(Exception e){
+									id = 0;	// Bury it alive
+								}
+								response.setId(id.toString());
+							}
+						}
+					}
+				}
+
+				UserUtils.mapResponsesIntoUser(user);
 			}
 			initialized = true;
 		} catch (IOException e) {
@@ -64,14 +95,14 @@ public class UserDaoLocalImpl implements UserDao{
 
 	@Override
 	public User createUser(String echoId){
-		User user = users.get(echoId);
+		User user = mapOfUsersByEchoId.get(echoId);
 		if(user != null){
 			// TODO: Consider an exception here. We shouldn't be trying to create a user where one exists
 			return user;
 		}
 
 		user = new User(echoId);
-		users.put(echoId, user);
+		mapOfUsersByEchoId.put(echoId, user);
 		if(user.getId() != null){
 			mapOfIdToUserId.put(user.getId().toString(), echoId);
 		}
@@ -80,7 +111,7 @@ public class UserDaoLocalImpl implements UserDao{
 
 	@Override
 	public Boolean saveUser(User user){
-		users.put(user.getEchoId(), user);
+		mapOfUsersByEchoId.put(user.getEchoId(), user);
 		return true;
 	}
 
@@ -93,13 +124,13 @@ public class UserDaoLocalImpl implements UserDao{
 
 	@Override
 	public User getUserByEchoId(String echoId){
-		return users.get(echoId);
+		return mapOfUsersByEchoId.get(echoId);
 	}
 
 	@Override
 	public List<User> getAllUserData() {
 		List<User> usersList = new ArrayList<User>();
-		for(Entry<String, User> entry : users.entrySet()){
+		for(Entry<String, User> entry : mapOfUsersByEchoId.entrySet()){
 			usersList.add(entry.getValue());
 		}
 		return usersList;

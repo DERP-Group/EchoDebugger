@@ -30,6 +30,7 @@ import com.derpgroup.echodebugger.configuration.MainConfig;
 import com.derpgroup.echodebugger.health.BasicHealthCheck;
 import com.derpgroup.echodebugger.jobs.UserDaoLocalImplThread;
 import com.derpgroup.echodebugger.model.UserDaoLocalImpl;
+import com.derpgroup.echodebugger.providers.ResponderExceptionMapper;
 import com.derpgroup.echodebugger.resource.EchoDebuggerResource;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -79,5 +80,8 @@ public class App extends Application<MainConfig> {
 
 		// Resources
 		environment.jersey().register(debuggerResource);
+
+		// Providers
+		environment.jersey().register(new ResponderExceptionMapper());
 	}
 }

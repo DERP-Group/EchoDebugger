@@ -24,21 +24,32 @@ import io.dropwizard.setup.Environment;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.UriInfo;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,16 +59,20 @@ import com.amazon.speech.speechlet.LaunchRequest;
 import com.amazon.speech.speechlet.SessionEndedRequest;
 import com.amazon.speech.speechlet.SpeechletException;
 import com.derpgroup.echodebugger.configuration.MainConfig;
+import com.derpgroup.echodebugger.exceptions.ExceptionType;
+import com.derpgroup.echodebugger.exceptions.ResponderException;
 import com.derpgroup.echodebugger.logger.EchoDebuggerLogger;
 import com.derpgroup.echodebugger.model.Response;
 import com.derpgroup.echodebugger.model.ResponseGroup;
+import com.derpgroup.echodebugger.model.ResponseGroupSummary;
 import com.derpgroup.echodebugger.model.ResponseKey;
 import com.derpgroup.echodebugger.model.User;
 import com.derpgroup.echodebugger.model.UserDao;
 import com.derpgroup.echodebugger.util.AlexaResponseUtil;
+import com.derpgroup.echodebugger.util.ResponderUtils;
+import com.derpgroup.echodebugger.util.ResponseGroupUtils;
 import com.derpgroup.echodebugger.util.UserSorter;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.derpgroup.echodebugger.util.UserUtils;
 
 
 /**
@@ -71,6 +86,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Consumes({MediaType.APPLICATION_JSON,MediaType.TEXT_PLAIN})
 public class EchoDebuggerResource {
 	final static Logger LOG = LoggerFactory.getLogger(EchoDebuggerResource.class);
+	final static Set<String> RESERVED_PARAM_NAMES = new HashSet<>(Arrays.asList("intent","append","state"));
 
 	private UserDao userDao;
 	private String password;
@@ -86,6 +102,106 @@ public class EchoDebuggerResource {
 	}
 
 	/**
+	 * Validates the query params by looking for repeats
+	 * @param queryParams
+	 */
+	public void validateQueryParams(MultivaluedMap<String, String> queryParams){
+		if(MapUtils.isEmpty(queryParams)){return;}
+
+		for(Entry<String,List<String>> entry : queryParams.entrySet()){
+			extractParamValue(queryParams, entry.getKey());
+		}
+	}
+
+	/**
+	 * The multi value map contains a list of values for each key. That list should only
+	 * be one item long. This extracts that item.
+	 * @param queryParams
+	 * @param key
+	 * @return
+	 */
+	public String extractParamValue(MultivaluedMap<String, String> queryParams, String key){
+		if(MapUtils.isEmpty(queryParams) || StringUtils.isEmpty(key)){return null;}
+		List<String> values = queryParams.get(key);
+		if(CollectionUtils.isEmpty(values)){return null;}
+		if(values.size() != 1){
+			throw new ResponderException("Repeated query parameters are not allowed. The repeated parameter is ("+key+")", ExceptionType.REPEAT_QUERY_PARAMETER);
+		}
+		return values.get(0);
+	}
+
+	/**
+	 * Extracts a map of non-reserved query params. This is used to obtain a map
+	 * of all the custom slots specified in the request.
+	 * @param queryParams
+	 * @return
+	 */
+	public Map<String,String> extractSlots(MultivaluedMap<String, String> queryParams){
+		if(MapUtils.isEmpty(queryParams)){return null;}
+
+		Map<String,String> paramMap = new HashMap<>();
+		for(Entry<String,List<String>> entry : queryParams.entrySet()){
+			if(!RESERVED_PARAM_NAMES.contains(entry.getKey())){
+				paramMap.put(entry.getKey(), extractParamValue(queryParams, entry.getKey()));
+			}
+		}
+		if(MapUtils.isEmpty(paramMap)){return null;}
+		return paramMap;
+	}
+
+	@Path("/users/{userId}/responses/{responseGroupId}/{responseId}")
+	@POST
+	public Map<String, Object> saveResponseByResponseId(
+			Map<String, Object> body,
+			@PathParam("userId") String userId,
+			@PathParam("responseGroupId") Integer responseGroupId,
+			@PathParam("responseId") Integer responseId
+			){
+		User user = userDao.getUserById(userId);
+
+		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
+		if(user == null){
+			user = userDao.getUserByEchoId(userId);
+		}
+		boolean requestIsAllowed = user != null;
+		EchoDebuggerLogger.logSaveNewResponse(body, userId, requestIsAllowed);	// TODO: Update this to store query params
+		if(user==null){
+			EchoDebuggerLogger.logAccessRequest(userId,"SINGLE_RESPONSE",false);	// TODO: Upgrade this
+			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
+		}
+
+		user.setLastUploadTime(Instant.now());
+		user.setNumContentUploads(user.getNumContentUploads()+1);
+
+		// Abort storing it if the request is too long
+		int responseLength = ResponderUtils.getLengthOfContent(body);
+		user.setNumCharactersUploaded(user.getNumCharactersUploaded()+responseLength);
+		if(responseLength > maxAllowedResponseLength){
+			user.setNumUploadsTooLarge(user.getNumUploadsTooLarge()+1);
+			userDao.saveUser(user);
+			throw new ResponderException("The response is too long. Alexa limits response sizes to 8000 characters."
+					+ "This response was "+responseLength+" characters long. Please see their restrictions here: "
+					+ "https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/alexa-skills-kit-interface-reference#Response%20Format",
+					ExceptionType.RESPONSE_TOO_LONG);
+		}
+
+		ResponseGroup responseGroup = UserUtils.getResponseGroup(user, responseGroupId);
+		if(responseGroup == null){
+			throw new ResponderException("There is no saved group with the id of ("+responseGroupId+") for user ("+userId+")", ExceptionType.NO_SAVED_RESPONSE);
+		}
+
+		Response response = ResponseGroupUtils.getResponse(responseGroup, responseId);
+		if(response == null){
+			throw new ResponderException("There is no saved response with the id of ("+responseId+") in group ("+responseGroupId+") for user ("+userId+")", ExceptionType.NO_SAVED_RESPONSE);
+		}
+
+		response.setData(body);
+		Map<String, Object> responseMap = new HashMap<>();
+		responseMap.put("Response path","/responder/users/"+userId+"/responses/"+responseGroup.getId()+"/"+response.getId().toString());
+		return responseMap;
+	}
+
+	/**
 	 * This is the primary endpoint used for saving responses
 	 * @param body
 	 * @param userId
@@ -93,7 +209,14 @@ public class EchoDebuggerResource {
 	 */
 	@Path("/users/{userId}")
 	@POST
-	public Map<String, Object> saveResponseForUserId(Map<String, Object> body, @PathParam("userId") String userId){
+	public Map<String, Object> saveResponseForUserId(
+			Map<String, Object> body,
+			@PathParam("userId") String userId,
+			@Context UriInfo uriInfo
+			){
+		MultivaluedMap<String, String> queryParams = uriInfo.getQueryParameters();
+		validateQueryParams(queryParams);
+
 		User user = userDao.getUserById(userId);
 
 		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
@@ -102,7 +225,7 @@ public class EchoDebuggerResource {
 		}
 
 		boolean requestIsAllowed = debugMode || user != null;
-		EchoDebuggerLogger.logSaveNewResponse(body, userId, requestIsAllowed);
+		EchoDebuggerLogger.logSaveNewResponse(body, userId, requestIsAllowed);	// TODO: Update this to store query params
 
 		if(user == null){
 			// DebugMode let's us register responses for accounts that don't exist
@@ -112,9 +235,7 @@ public class EchoDebuggerResource {
 			}
 			// If the request is for an ID that we haven't seen before, refuse it
 			else{
-				Map<String, Object> response = new HashMap<String, Object>();
-				response.put("Result", "This is not a known id. Please access this skill through your Echo to automatically register your Echo and obtain an id.");
-				return response;
+				throw new ResponderException("This is not a known id. Please access this skill through your Echo to automatically register your Echo and obtain an id.", ExceptionType.UNRECOGNIZED_ID);
 			}
 		}
 
@@ -122,48 +243,58 @@ public class EchoDebuggerResource {
 		user.setNumContentUploads(user.getNumContentUploads()+1);
 
 		// Abort storing it if the request is too long
-		int responseLength = getLengthOfContent(body);
+		int responseLength = ResponderUtils.getLengthOfContent(body);
 		user.setNumCharactersUploaded(user.getNumCharactersUploaded()+responseLength);
 		if(responseLength > maxAllowedResponseLength){
-			Map<String, Object> response = new HashMap<String, Object>();
-			response.put("Result", "The response is too long. Alexa limits response sizes to 8000 characters. This response was "+responseLength+" characters long. Please see their restrictions here: https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/alexa-skills-kit-interface-reference#Response%20Format");
 			user.setNumUploadsTooLarge(user.getNumUploadsTooLarge()+1);
 			userDao.saveUser(user);
-			return response;
+			throw new ResponderException("The response is too long. Alexa limits response sizes to 8000 characters."
+					+ "This response was "+responseLength+" characters long. Please see their restrictions here: "
+					+ "https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/alexa-skills-kit-interface-reference#Response%20Format",
+					ExceptionType.RESPONSE_TOO_LONG);
 		}
-		if(CollectionUtils.isEmpty(user.getResponseGroups())){
-			user.setResponseGroups(new ArrayList<ResponseGroup>());
-		}
-		ResponseKey responseKey = new ResponseKey();
-		Response responseBody = new Response(body);
 
-		// Hacky, this is currently just overwriting everything the user has
-		ResponseGroup responseGroup = new ResponseGroup(responseKey, responseBody);
-		user.getResponseGroups().clear();
-		user.getResponseGroups().add(responseGroup);
+		// Save the response to the User object
+		boolean shouldAppendResponse = Boolean.parseBoolean(extractParamValue(queryParams, "append"));
+		String intent = extractParamValue(queryParams, "intent");
+		if(StringUtils.isEmpty(intent)){intent = ResponseKey.DEFAULT_RESPONDER_INTENT;}
+		String state = extractParamValue(queryParams, "state");
+		Map<String, String> slots = extractSlots(queryParams);
 
+		ResponseKey responseKey = new ResponseKey(intent, slots, state);
+		Response response = new Response(body);
+
+		UserUtils.saveResponse(user, responseKey, response, shouldAppendResponse);
 		userDao.saveUser(user);
-		return body;
+
+		ResponseGroup responseGroup = UserUtils.getResponseGroupByResponseKey(user, responseKey);
+
+		Map<String, Object> responseMap = new HashMap<>();
+		responseMap.put("Response path","/responder/users/"+userId+"/responses/"+responseGroup.getId()+"/"+response.getId().toString());
+		return responseMap;
 	}
 
 	// Deprecate this, we want to move users away from it
 	@Path("/user/{userId}")
 	@POST
-	public Map<String, Object> saveResponseForUserId_old(Map<String, Object> body, @PathParam("userId") String userId){
-		return saveResponseForUserId(body, userId);
+	public Map<String, Object> saveResponseForUserId_old(
+			Map<String, Object> body,
+			@PathParam("userId") String userId,
+			@Context UriInfo uriInfo){
+		return saveResponseForUserId(body, userId, uriInfo);
 	}
 
-	// Deprecate this
+	// TODO: Remove this endpoint after people stop using it
 	@Path("/user/{userId}")
 	@GET
-	public Map<String, Object> getResponseForEchoId_old(@PathParam("userId") String userId){
-		return getResponseForEchoId(userId);
+	public Map<String, Object> getDefaultResponseByUserId_old(@PathParam("userId") String userId){
+		return getDefaultResponseByUserId(userId);
 	}
 
-	// TODO: Change this endpoint to be a UI manipulatable through a webpage
+	// TODO: Change this endpoint to be a UI in a webpage that lets people manually edit their entries
 	@Path("/users/{userId}")
 	@GET
-	public Map<String, Object> getResponseForEchoId(@PathParam("userId") String userId){
+	public Map<String, Object> getDefaultResponseByUserId(@PathParam("userId") String userId){
 		User user = userDao.getUserById(userId);
 
 		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
@@ -173,9 +304,7 @@ public class EchoDebuggerResource {
 
 		if(user==null){
 			EchoDebuggerLogger.logAccessRequest(userId,"SINGLE_RESPONSE",false);
-			Map<String, Object> response = new HashMap<String, Object>();
-			response.put("Result", "There is no user with the id of ("+userId+")");
-			return response;
+			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
 		}
 		EchoDebuggerLogger.logAccessRequest(user.getEchoId(),"SINGLE_RESPONSE",true);
 		user.setLastWebDownloadTime(Instant.now());
@@ -191,16 +320,102 @@ public class EchoDebuggerResource {
 			response = responseGroups.get(0).getResponses().get(0).getData();
 		}
 
-		int responseLength = getLengthOfContent(response);
+		int responseLength = ResponderUtils.getLengthOfContent(response);
 		user.setNumCharactersDownloaded(user.getNumCharactersDownloaded()+responseLength);
 		userDao.saveUser(user);
 
 		if(response==null){
-			response = new HashMap<String, Object>();
-			response.put("Result", "There are no responses stored for user ("+userId+")");
-			return response;
+			throw new ResponderException("There are no responses stored for user ("+userId+")", ExceptionType.NO_SAVED_RESPONSE);
 		}
 		return response;
+	}
+
+	@Path("/users/{userId}/responses")
+	@GET
+	public Map<String, Object> getResponsesForUser(
+			@PathParam("userId") String userId,
+			@PathParam("responseGroupId") Integer responseGroupId){
+		User user = userDao.getUserById(userId);
+
+		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
+		if(user == null){
+			user = userDao.getUserByEchoId(userId);
+		}
+		if(user==null){
+			EchoDebuggerLogger.logAccessRequest(userId,"SINGLE_RESPONSE",false);	// TODO: Upgrade this
+			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
+		}
+
+		// Accumulate the ResponseGroups
+		List<ResponseGroupSummary> responseGroupSummaries = new ArrayList<>();
+		List<ResponseGroup> responseGroups = user.getResponseGroups();
+		if(CollectionUtils.isNotEmpty(responseGroups)){
+			for(ResponseGroup responseGroup : responseGroups){
+				responseGroupSummaries.add(ResponseGroupUtils.buildResponseGroupSummary(user, responseGroup));
+			}
+		}
+
+		Map<String, Object> responseMap = new LinkedHashMap<>();
+		responseMap.put("Description","This is a list of all responses saved for this user");
+		responseMap.put("ResponseGroups", responseGroupSummaries);
+		return responseMap;
+	}
+
+	@Path("/users/{userId}/responses/{responseGroupId}")
+	@GET
+	public Map<String, Object> getResponseById(
+			@PathParam("userId") String userId,
+			@PathParam("responseGroupId") Integer responseGroupId){
+		User user = userDao.getUserById(userId);
+
+		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
+		if(user == null){
+			user = userDao.getUserByEchoId(userId);
+		}
+		if(user==null){
+			EchoDebuggerLogger.logAccessRequest(userId,"SINGLE_RESPONSE",false);	// TODO: Upgrade this
+			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
+		}
+
+		ResponseGroup responseGroup = UserUtils.getResponseGroup(user, responseGroupId);
+		if(responseGroup == null){
+			throw new ResponderException("There is no saved response group with the id of ("+responseGroupId+") for user ("+userId+")", ExceptionType.NO_SAVED_RESPONSE);
+		}
+
+		Map<String, Object> responseMap = new LinkedHashMap<>();
+		responseMap.put("Description","This is a list of all responses saved for these input parameters");
+		responseMap.put("ResponseGroup", ResponseGroupUtils.buildResponseGroupSummary(user, responseGroup));
+		return responseMap;
+	}
+
+	@Path("/users/{userId}/responses/{responseGroupId}/{responseId}")
+	@GET
+	public Map<String, Object> getResponseById(
+			@PathParam("userId") String userId,
+			@PathParam("responseGroupId") Integer responseGroupId,
+			@PathParam("responseId") Integer responseId){
+		User user = userDao.getUserById(userId);
+
+		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
+		if(user == null){
+			user = userDao.getUserByEchoId(userId);
+		}
+		if(user==null){
+			EchoDebuggerLogger.logAccessRequest(userId,"SINGLE_RESPONSE",false);	// TODO: Upgrade this
+			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
+		}
+
+		ResponseGroup responseGroup = UserUtils.getResponseGroup(user, responseGroupId);
+		if(responseGroup == null){
+			throw new ResponderException("There is no saved group with the id of ("+responseGroupId+") for user ("+userId+")", ExceptionType.NO_SAVED_RESPONSE);
+		}
+
+		Response response = ResponseGroupUtils.getResponse(responseGroup, responseId);
+		if(response == null){
+			throw new ResponderException("There is no saved response with the id of ("+responseId+") in group ("+responseGroupId+") for user ("+userId+")", ExceptionType.NO_SAVED_RESPONSE);
+		}
+
+		return response.getData();
 	}
 
 	@Path("/users")
@@ -223,6 +438,66 @@ public class EchoDebuggerResource {
 	@GET
 	public Object getAllResponses_old(@QueryParam("p") String p){
 		return getAllResponses(p);
+	}
+
+	@Path("/users/{userId}")
+	@DELETE
+	public Map<String, Object> deleteUserById(
+			@PathParam("userId") String userId){
+		User user = userDao.getUserById(userId);
+
+		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
+		if(user == null){
+			user = userDao.getUserByEchoId(userId);
+		}
+		if(user==null){
+			EchoDebuggerLogger.logAccessRequest(userId,"SINGLE_RESPONSE",false);	// TODO: Upgrade this
+			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
+		}
+
+		// TODO: Implement this
+		return null;
+	}
+
+	@Path("/users/{userId}/responses/{responseGroupId}")
+	@DELETE
+	public Map<String, Object> deleteResponseGroupById(
+			@PathParam("userId") String userId,
+			@PathParam("responseGroupId") Integer responseGroupId){
+		User user = userDao.getUserById(userId);
+
+		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
+		if(user == null){
+			user = userDao.getUserByEchoId(userId);
+		}
+		if(user==null){
+			EchoDebuggerLogger.logAccessRequest(userId,"SINGLE_RESPONSE",false);	// TODO: Upgrade this
+			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
+		}
+
+		// TODO: Implement this
+		return null;
+	}
+
+	@Path("/users/{userId}/responses/{responseGroupId}/{responseId}")
+	@DELETE
+	public Map<String, Object> deleteResponseById(
+			@PathParam("userId") String userId,
+			@PathParam("responseGroupId") Integer responseGroupId,
+			@PathParam("responseId") Integer responseId){
+		User user = userDao.getUserById(userId);
+
+		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
+		if(user == null){
+			user = userDao.getUserByEchoId(userId);
+		}
+		if(user==null){
+			EchoDebuggerLogger.logAccessRequest(userId,"SINGLE_RESPONSE",false);	// TODO: Upgrade this
+			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
+		}
+
+		// TODO: Implement this
+		return null;
 	}
 
 	/**
@@ -260,19 +535,30 @@ public class EchoDebuggerResource {
 		}
 		EchoDebuggerLogger.logEchoRequest(echoId,intent);
 
+		// If the user has intents registered to override default Responder intents, then use them
+		Set<String> registeredIntents = UserUtils.getRegisteredIntents(user);
+
+		Map<String, String> slots = ResponderUtils.getMessageAsMap(request.getRequest());
+
 		switch(intent){
 		case "AMAZON.HelpIntent":
-			return getIntro(user.getId().toString());
-
+			if(!registeredIntents.contains("AMAZON.HelpIntent")){
+				return getIntro(user.getId().toString());
+			}
+			return getUserContent(user, intent, null, slots);
 		case "WHATISMYID":
 			String title = "Echo ID";
 			String content = "Your ID is "+user.getId().toString();
 			String ssml = "Your ID is now printed in the Alexa app. Please check to see the exact spelling. It is case-sensitive. This ID is unique between you and this skill. If you delete the skill you will be issued a new ID when you next connect.";
 			return AlexaResponseUtil.createSimpleResponse(title,content,ssml);
 		case "START_OF_CONVERSATION":
+			if(!registeredIntents.contains("START_OF_CONVERSATION")){
+				intent = "GETRESPONSE";
+			}
+			return getUserContent(user, intent, null, slots);
 		case "GETRESPONSE":
 		default:
-			return getUserContent(user);
+			return getUserContent(user, intent, null, slots);
 		}
 	}
 
@@ -280,22 +566,62 @@ public class EchoDebuggerResource {
 	public void setUserDao(UserDao userDao) {this.userDao = userDao;}
 
 	// TODO: Soon to be deprecated
-	public Object getUserContent(User user){
+	public Object getDefaultUserContent(User user){
+
+		Object response = null;
+		List<ResponseGroup> responseGroups = user.getResponseGroups();
+		if(CollectionUtils.isNotEmpty(responseGroups) &&
+				responseGroups.get(0) != null &&
+				CollectionUtils.isNotEmpty(responseGroups.get(0).getResponses()) &&
+				responseGroups.get(0).getResponses().get(0) != null){
+			response = responseGroups.get(0).getResponses().get(0).getData();
+		}
+		else {
+			response = AlexaResponseUtil.createSimpleResponse("You have no saved responses","There are no saved responses for your ID ("+user.getId().toString()+")","There are no saved responses");
+		}
+
+		// Update statistics for the user
 		user.setNumContentDownloads(user.getNumContentDownloads()+1);
 		user.setLastEchoDownloadTime(Instant.now());
-		int contentLength = getLengthOfContent(user.getData());
+		int contentLength = ResponderUtils.getLengthOfContent(response);
 		user.setNumCharactersDownloaded(user.getNumCharactersDownloaded() + contentLength);
 		userDao.saveUser(user);
 
-		List<ResponseGroup> responseGroups = user.getResponseGroups();
-		if(CollectionUtils.isEmpty(responseGroups) ||
-				responseGroups.get(0) == null ||
-				CollectionUtils.isEmpty(responseGroups.get(0).getResponses()) ||
-				responseGroups.get(0).getResponses().get(0) == null){
+		return response;
+	}
 
-			return AlexaResponseUtil.createSimpleResponse("You have no saved responses","There are no saved responses for your ID ("+user.getId().toString()+")","There are no saved responses");
+	public Object getUserContent(User user, String intent, String state, Map<String,String> slots){
+
+		if(MapUtils.isEmpty(slots)){slots = null;}
+
+		ResponseKey responseKey = new ResponseKey(intent, slots, state);
+		ResponseGroup responseGroup = UserUtils.getResponseGroupByResponseKey(user, responseKey);
+
+		Object response = null;
+
+		String serializedResponseKey = ResponderUtils.serialize(responseKey);
+		Object errorResponse = AlexaResponseUtil.createSimpleResponse("There is no response for this input","There is no response for this input\n"+serializedResponseKey,"There is no response for this input");
+		if(responseGroup == null){
+			response = errorResponse;
 		}
-		return responseGroups.get(0).getResponses().get(0).getData();
+		else{
+			Response savedResponse = ResponseGroupUtils.getRandomResponse(responseGroup);
+			if(savedResponse != null){
+				response = savedResponse.getData();
+			}
+			else{
+				response = errorResponse;
+			}
+		}
+
+		// Update statistics for the user
+		user.setNumContentDownloads(user.getNumContentDownloads()+1);
+		user.setLastEchoDownloadTime(Instant.now());
+		int contentLength = ResponderUtils.getLengthOfContent(response);
+		user.setNumCharactersDownloaded(user.getNumCharactersDownloaded() + contentLength);
+		userDao.saveUser(user);
+
+		return response;
 	}
 
 	public Object getIntro(String userId){
@@ -315,14 +641,4 @@ public class EchoDebuggerResource {
 		return AlexaResponseUtil.createSimpleResponse("How to use the A.S.K. Responder",plaintext,ssml);
 	}
 
-	public int getLengthOfContent(Map<String, Object> content){
-		if(content == null){return 0;}
-		try {
-			ObjectMapper mapper = new ObjectMapper();
-			String serializedBody = mapper.writeValueAsString(content);
-			return serializedBody.length();
-		} catch (JsonProcessingException e) {
-			return 0;
-		}
-	}
 }
