@@ -44,40 +44,40 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
  */
 public class App extends Application<MainConfig> {
 
-  public static void main(String[] args) throws Exception {
-    new App().run(args);
-  }
+	public static void main(String[] args) throws Exception {
+		new App().run(args);
+	}
 
-  @Override
-  public void initialize(Bootstrap<MainConfig> bootstrap) {
-    bootstrap.getObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-  }
+	@Override
+	public void initialize(Bootstrap<MainConfig> bootstrap) {
+		bootstrap.getObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+	}
 
-  @Override
-  public void run(MainConfig config, Environment environment) throws IOException {
-    if (config.isPrettyPrint()) {
-      ObjectMapper mapper = environment.getObjectMapper();
-      mapper.enable(SerializationFeature.INDENT_OUTPUT);
-      mapper.registerModule(new JavaTimeModule());
-      mapper.configure( SerializationFeature.WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS, false );
-      mapper.configure( SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false );
-    }
+	@Override
+	public void run(MainConfig config, Environment environment) throws IOException {
+		if (config.isPrettyPrint()) {
+			ObjectMapper mapper = environment.getObjectMapper();
+			mapper.enable(SerializationFeature.INDENT_OUTPUT);
+			mapper.registerModule(new JavaTimeModule());
+			mapper.configure( SerializationFeature.WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS, false );
+			mapper.configure( SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false );
+		}
 
-    // Health checks
-    environment.healthChecks().register("basics", new BasicHealthCheck(config, environment));
+		// Health checks
+		environment.healthChecks().register("basics", new BasicHealthCheck(config, environment));
 
-    // Load up the content
-    UserDaoLocalImpl userDao = new UserDaoLocalImpl(config, environment);
-    userDao.initialize();
-    
-    // Build the helper thread that saves data every X minutes
-    UserDaoLocalImplThread userThread = new UserDaoLocalImplThread(config, userDao);
-    userThread.start();
-    
-    EchoDebuggerResource debuggerResource = new EchoDebuggerResource(config, environment);
-    debuggerResource.setUserDao(userDao);
-    
-    // Resources
-    environment.jersey().register(debuggerResource);
-  }
+		// Load up the content
+		UserDaoLocalImpl userDao = new UserDaoLocalImpl(config, environment);
+		userDao.initialize();
+
+		// Build the helper thread that saves data every X minutes
+		UserDaoLocalImplThread userThread = new UserDaoLocalImplThread(config, userDao);
+		userThread.start();
+
+		EchoDebuggerResource debuggerResource = new EchoDebuggerResource(config, environment);
+		debuggerResource.setUserDao(userDao);
+
+		// Resources
+		environment.jersey().register(debuggerResource);
+	}
 }

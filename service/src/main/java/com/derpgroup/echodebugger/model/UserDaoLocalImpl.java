@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.io.FileUtils;
@@ -26,114 +25,127 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 public class UserDaoLocalImpl implements UserDao{
-  private final Logger LOG = LoggerFactory.getLogger(UserDaoLocalImpl.class);
+	private final Logger LOG = LoggerFactory.getLogger(UserDaoLocalImpl.class);
 
-  private Map<String,String> mapOfIdToUserId = new ConcurrentHashMap<>();
-  private Map<String,User> users = new ConcurrentHashMap<String,User>();
-  private String contentFile;
-  private Boolean initialized = false;
-  private ObjectMapper mapper;
+	private Map<String,String> mapOfIdToUserId = new ConcurrentHashMap<>();
+	private Map<String,User> users = new ConcurrentHashMap<String,User>();
+	private String contentFile;
+	private Boolean initialized = false;
+	private ObjectMapper mapper;
 
-  public UserDaoLocalImpl(MainConfig config, Environment env){
-    contentFile = config.getEchoDebuggerConfig().getContentFile();
-    mapper = new ObjectMapper().registerModule(new JavaTimeModule());
-    mapper.configure( SerializationFeature.WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS, false );
-    mapper.configure( SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false );
-  }
-  
-  /**
-   * Loads the user account data from the local data file
-   */
-  public void initialize(){
-    try {
-      List<User> userList = readUsersFromFile(contentFile);
-      for(User user : userList){
-        users.put(user.getEchoId(), user);
+	public UserDaoLocalImpl(MainConfig config, Environment env){
+		contentFile = config.getEchoDebuggerConfig().getContentFile();
+		mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+		mapper.configure( SerializationFeature.WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS, false );
+		mapper.configure( SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false );
+	}
 
-        // Backwards compatible change to upgrade current users to the new ID
-        if(user.getId() == null){
-          user.setId(UUID.randomUUID());
-        }
-        mapOfIdToUserId.put(user.getId().toString(), user.getEchoId());
-      }
-      initialized = true;
-    } catch (IOException e) {
-      LOG.error("Could not initialize users from data file",e);
-    }
-  }
-  
-  public Boolean isInitialized(){
-    return initialized;
-  }
+	/**
+	 * Loads the user account data from the local data file
+	 */
+	@Override
+	public void initialize(){
+		try {
+			List<User> userList = readUsersFromFile(contentFile);
+			for(User user : userList){
+				users.put(user.getEchoId(), user);
+				mapOfIdToUserId.put(user.getId().toString(), user.getEchoId());
 
-  public User createUser(String echoId){
-    User user = users.get(echoId);
-    if(user != null){
-      // TODO: Consider an exception here. We shouldn't be trying to create a user where one exists
-      return user;
-    }
-    
-    user = new User(echoId);
-    users.put(echoId, user);
-    if(user.getId() != null){
-      mapOfIdToUserId.put(user.getId().toString(), echoId);
-    }
-    return user;
-  }
-  
-  public Boolean saveUser(User user){
-    users.put(user.getEchoId(), user);
-    return true;
-  }
+				// Backwards compatible change to upgrade users to the new Response storage format
+				if(user.getData() != null){
+					ResponseKey responseKey = new ResponseKey();
+					Response response = new Response(user.getData());
 
-  public User getUserById(String id){
-    String echoId = mapOfIdToUserId.get(id);
-    if(StringUtils.isEmpty(echoId)){return null;}
-    return getUserByEchoId(echoId);
-  }
+					ResponseGroup responseGroup = new ResponseGroup(responseKey, response);
+					user.getResponseGroups().add(responseGroup);
 
-  public User getUserByEchoId(String echoId){
-    return users.get(echoId);
-  }
+					user.setData(null);
+				}
+			}
+			initialized = true;
+		} catch (IOException e) {
+			LOG.error("Could not initialize users from data file",e);
+		}
+	}
 
-  public List<User> getAllUserData() {
-    List<User> usersList = new ArrayList<User>();
-    for(Entry<String, User> entry : users.entrySet()){
-      usersList.add(entry.getValue());
-    }
-    return usersList;
-  }
+	@Override
+	public Boolean isInitialized(){
+		return initialized;
+	}
+
+	@Override
+	public User createUser(String echoId){
+		User user = users.get(echoId);
+		if(user != null){
+			// TODO: Consider an exception here. We shouldn't be trying to create a user where one exists
+			return user;
+		}
+
+		user = new User(echoId);
+		users.put(echoId, user);
+		if(user.getId() != null){
+			mapOfIdToUserId.put(user.getId().toString(), echoId);
+		}
+		return user;
+	}
+
+	@Override
+	public Boolean saveUser(User user){
+		users.put(user.getEchoId(), user);
+		return true;
+	}
+
+	@Override
+	public User getUserById(String id){
+		String echoId = mapOfIdToUserId.get(id);
+		if(StringUtils.isEmpty(echoId)){return null;}
+		return getUserByEchoId(echoId);
+	}
+
+	@Override
+	public User getUserByEchoId(String echoId){
+		return users.get(echoId);
+	}
+
+	@Override
+	public List<User> getAllUserData() {
+		List<User> usersList = new ArrayList<User>();
+		for(Entry<String, User> entry : users.entrySet()){
+			usersList.add(entry.getValue());
+		}
+		return usersList;
+	}
 
 
 
-  // Local helper functions
-  protected List<User> readUsersFromFile(String fileName) throws IOException{
-    final File file = new File(fileName);
-    if(file.createNewFile()){
-      LOG.info("Created blank user data file for use");
-      writeToFile(new ArrayList<User>(),fileName);
-    }
+	// Local helper functions
+	protected List<User> readUsersFromFile(String fileName) throws IOException{
+		final File file = new File(fileName);
+		if(file.createNewFile()){
+			LOG.info("Created blank user data file for use");
+			writeToFile(new ArrayList<User>(),fileName);
+		}
 
-    String content = new String(Files.readAllBytes(Paths.get(fileName)),Charset.defaultCharset());
-    return mapper.readValue(content, new TypeReference<List<User>>(){});
-  }
+		String content = new String(Files.readAllBytes(Paths.get(fileName)),Charset.defaultCharset());
+		return mapper.readValue(content, new TypeReference<List<User>>(){});
+	}
 
-  public void saveUsersToFile(){
-    List<User> userList = getAllUserData();
-    try {
-      writeToFile(userList, contentFile);
-    } catch (IOException e) {
-      LOG.debug("There was a problem saving user data",e);
-    }
-  }
+	public void saveUsersToFile(){
+		List<User> userList = getAllUserData();
+		try {
+			writeToFile(userList, contentFile);
+		} catch (IOException e) {
+			LOG.debug("There was a problem saving user data",e);
+		}
+	}
 
-  public void writeToFile(List<User> userList, String fileName) throws IOException{
-    final File file = new File(fileName);
-    if(file.createNewFile()){
-      LOG.info("Created new user data file for use");
-    }
-    String content = mapper.writeValueAsString(userList);
+	public void writeToFile(List<User> userList, String fileName) throws IOException{
+		final File file = new File(fileName);
+		if(file.createNewFile()){
+			LOG.info("Created new user data file for use");
+		}
+		String content = mapper.writeValueAsString(userList);
 
-    FileUtils.writeStringToFile(file, content, Charset.defaultCharset());
-  }
+		FileUtils.writeStringToFile(file, content, Charset.defaultCharset());
+	}
 }
