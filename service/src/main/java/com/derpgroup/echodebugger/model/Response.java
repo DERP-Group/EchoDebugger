@@ -9,11 +9,10 @@ public class Response {
 	private Map<String, Object> data = new HashMap<>();
 
 	public Response(){
-		id = "0";
 	}
-	public Response(Map<String, Object> data){
+	public Response(String id, Map<String, Object> data){
+		this.id = id;
 		this.data = data;
-		id = "0";
 	}
 
 	public String getId() {return id;}

@@ -40,4 +40,18 @@ public interface UserDao {
 	 */
 	public List<User> getAllUserData();
 
+	/**
+	 * Deletes a user
+	 * @param user
+	 * @return
+	 */
+	public User deleteUser(User user);
+
+	/**
+	 * Deletes an intent for a user
+	 * @param user
+	 * @param intentName
+	 * @return
+	 */
+	public IntentResponses deleteIntent(User user, String intentName);
 }
