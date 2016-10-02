@@ -13,8 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -52,24 +50,6 @@ public class UserDaoLocalImpl implements UserDao{
 			for(User user : userList){
 				mapOfUsersByEchoId.put(user.getEchoId(), user);
 				mapOfIdToUserId.put(user.getId().toString(), user.getEchoId());
-
-				// TODO: Remove this
-				// If they have the old format, and not the new format, convert them
-				if(MapUtils.isEmpty(user.getIntents()) && CollectionUtils.isNotEmpty(user.getResponseGroups())){
-					IntentResponses intent = new IntentResponses();
-					intent.setIntentName("GETRESPONSE");
-					ResponseGroup responseGroup = user.getResponseGroups().get(0);
-					if(responseGroup != null && CollectionUtils.isNotEmpty(responseGroup.getResponses())){
-						Response response = responseGroup.getResponses().get(0);
-						if(response != null){
-							intent.setData(response.getData());
-						}
-					}
-					user.getIntents().put("GETRESPONSE", intent);
-				}
-				user.setResponseGroups(null);
-
-				//				UserUtils.mapResponsesIntoUser(user);	// TODO: Remove
 			}
 			initialized = true;
 		} catch (IOException e) {
@@ -132,6 +112,11 @@ public class UserDaoLocalImpl implements UserDao{
 		}
 		saveUsersToFile();
 		return user;
+	}
+
+	@Override
+	public IntentResponses deleteIntent(User user, String intentName){
+		return user.getIntents().remove(intentName);
 	}
 
 	// Local helper functions

@@ -47,4 +47,11 @@ public interface UserDao {
 	 */
 	public User deleteUser(User user);
 
+	/**
+	 * Deletes an intent for a user
+	 * @param user
+	 * @param intentName
+	 * @return
+	 */
+	public IntentResponses deleteIntent(User user, String intentName);
 }

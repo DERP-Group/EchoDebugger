@@ -91,54 +91,6 @@ public class EchoDebuggerResource {
 		baseUrl = config.getEchoDebuggerConfig().getBaseUrl();
 	}
 
-	/**
-	 * Validates the query params by looking for repeats
-	 * @param queryParams
-	 */
-	//	public void validateQueryParams(MultivaluedMap<String, String> queryParams){
-	//		if(MapUtils.isEmpty(queryParams)){return;}
-	//
-	//		for(Entry<String,List<String>> entry : queryParams.entrySet()){
-	//			extractParamValue(queryParams, entry.getKey());
-	//		}
-	//	}
-
-	/**
-	 * The multi value map contains a list of values for each key. That list should only
-	 * be one item long. This extracts that item.
-	 * @param queryParams
-	 * @param key
-	 * @return
-	 */
-	//	public String extractParamValue(MultivaluedMap<String, String> queryParams, String key){
-	//		if(MapUtils.isEmpty(queryParams) || StringUtils.isEmpty(key)){return null;}
-	//		List<String> values = queryParams.get(key);
-	//		if(CollectionUtils.isEmpty(values)){return null;}
-	//		if(values.size() != 1){
-	//			throw new ResponderException("Repeated query parameters are not allowed. The repeated parameter is ("+key+")", ExceptionType.REPEAT_QUERY_PARAMETER);
-	//		}
-	//		return values.get(0);
-	//	}
-
-	/**
-	 * Extracts a map of non-reserved query params. This is used to obtain a map
-	 * of all the custom slots specified in the request.
-	 * @param queryParams
-	 * @return
-	 */
-	//	public Map<String,String> extractSlots(MultivaluedMap<String, String> queryParams){
-	//		if(MapUtils.isEmpty(queryParams)){return null;}
-	//
-	//		Map<String,String> paramMap = new HashMap<>();
-	//		for(Entry<String,List<String>> entry : queryParams.entrySet()){
-	//			if(!RESERVED_PARAM_NAMES.contains(entry.getKey())){
-	//				paramMap.put(entry.getKey(), extractParamValue(queryParams, entry.getKey()));
-	//			}
-	//		}
-	//		if(MapUtils.isEmpty(paramMap)){return null;}
-	//		return paramMap;
-	//	}
-
 	// Deprecate this, we want to move users away from it
 	@Path("/user/{userId}")
 	@POST
@@ -147,7 +99,10 @@ public class EchoDebuggerResource {
 			@PathParam("userId") String userId
 			){
 		LOG.info(userId+" is still using legacy POST /user/{userId}");
-		return saveResponseForUserId_default(body, userId);
+		saveResponseForUserId_default(body, userId);
+		Map<String, Object> response = new HashMap<>();
+		response.put("Warning", "This endpoint is deprecated and will be removed October 31st 2016. Responder has recently changed the API to use plural resource identifiers. Please use /users/{userId} instead.");
+		return response;
 	}
 
 	/**
@@ -238,7 +193,10 @@ public class EchoDebuggerResource {
 	@GET
 	public Map<String, Object> getDefaultResponseByUserId_legacy(@PathParam("userId") String userId){
 		LOG.info(userId+" is still using legacy GET /user/{userId}");
-		return getDefaultResponseByUserId(userId);
+		getDefaultResponseByUserId(userId);
+		Map<String, Object> response = new HashMap<>();
+		response.put("Warning", "This endpoint is deprecated and will be removed October 31st 2016. Responder has recently changed the API to use plural resource identifiers. Please use /users/{userId} instead.");
+		return response;
 	}
 
 	// TODO: Change this endpoint to be a UI in a webpage that lets people manually edit their entries
@@ -303,93 +261,6 @@ public class EchoDebuggerResource {
 		return intentResponses;
 	}
 
-	//	@Path("/users/{userId}/responses")
-	//	@GET
-	//	public Map<String, Object> getResponsesForUser(
-	//			@PathParam("userId") String userId){
-	//		User user = userDao.getUserById(userId);
-	//
-	//		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
-	//		if(user == null){
-	//			user = userDao.getUserByEchoId(userId);
-	//		}
-	//		if(user==null){
-	//			EchoDebuggerLogger.logAccessRequest(userId,"SINGLE_RESPONSE",false);	// TODO: Upgrade this
-	//			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
-	//		}
-	//
-	//		// Accumulate the ResponseGroups
-	//		List<ResponseGroupSummary> responseGroupSummaries = new ArrayList<>();
-	//		List<ResponseGroup> responseGroups = user.getResponseGroups();
-	//		if(CollectionUtils.isNotEmpty(responseGroups)){
-	//			for(ResponseGroup responseGroup : responseGroups){
-	//				responseGroupSummaries.add(ResponseGroupUtils.buildResponseGroupSummary(user, responseGroup));
-	//			}
-	//		}
-	//
-	//		Map<String, Object> responseMap = new LinkedHashMap<>();
-	//		responseMap.put("Description","This is a list of all responses saved for this user");
-	//		responseMap.put("ResponseGroups", responseGroupSummaries);
-	//		return responseMap;
-	//	}
-
-	//	@Path("/users/{userId}/responses/{responseGroupId}")
-	//	@GET
-	//	public Map<String, Object> getResponseById(
-	//			@PathParam("userId") String userId,
-	//			@PathParam("responseGroupId") Integer responseGroupId){
-	//		User user = userDao.getUserById(userId);
-	//
-	//		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
-	//		if(user == null){
-	//			user = userDao.getUserByEchoId(userId);
-	//		}
-	//		if(user==null){
-	//			EchoDebuggerLogger.logAccessRequest(userId,"SINGLE_RESPONSE",false);	// TODO: Upgrade this
-	//			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
-	//		}
-	//
-	//		ResponseGroup responseGroup = UserUtils.getResponseGroup(user, responseGroupId);
-	//		if(responseGroup == null){
-	//			throw new ResponderException("There is no saved response group with the id of ("+responseGroupId+") for user ("+userId+")", ExceptionType.NO_SAVED_RESPONSE);
-	//		}
-	//
-	//		Map<String, Object> responseMap = new LinkedHashMap<>();
-	//		responseMap.put("Description","This is a list of all responses saved for these input parameters");
-	//		responseMap.put("ResponseGroup", ResponseGroupUtils.buildResponseGroupSummary(user, responseGroup));
-	//		return responseMap;
-	//	}
-
-	//	@Path("/users/{userId}/responses/{responseGroupId}/{responseId}")
-	//	@GET
-	//	public Map<String, Object> getResponseById(
-	//			@PathParam("userId") String userId,
-	//			@PathParam("responseGroupId") Integer responseGroupId,
-	//			@PathParam("responseId") Integer responseId){
-	//		User user = userDao.getUserById(userId);
-	//
-	//		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
-	//		if(user == null){
-	//			user = userDao.getUserByEchoId(userId);
-	//		}
-	//		if(user==null){
-	//			EchoDebuggerLogger.logAccessRequest(userId,"SINGLE_RESPONSE",false);	// TODO: Upgrade this
-	//			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
-	//		}
-	//
-	//		ResponseGroup responseGroup = UserUtils.getResponseGroup(user, responseGroupId);
-	//		if(responseGroup == null){
-	//			throw new ResponderException("There is no saved group with the id of ("+responseGroupId+") for user ("+userId+")", ExceptionType.NO_SAVED_RESPONSE);
-	//		}
-	//
-	//		Response response = ResponseGroupUtils.getResponse(responseGroup, responseId);
-	//		if(response == null){
-	//			throw new ResponderException("There is no saved response with the id of ("+responseId+") in group ("+responseGroupId+") for user ("+userId+")", ExceptionType.NO_SAVED_RESPONSE);
-	//		}
-	//
-	//		return response.getData();
-	//	}
-
 	@Path("/users")
 	@GET
 	public Object getAllResponses(@QueryParam("p") String p){
@@ -411,7 +282,7 @@ public class EchoDebuggerResource {
 	public Object getAllResponses_old(@QueryParam("p") String p){
 		LOG.info("Legacy request for GET /user");
 		Map<String,String> response = new HashMap<>();
-		response.put("Result", "This endpoint is deprecated and will be removed shortly. Responder has recently changed the API to use plural identifiers. Please use /users instead.");
+		response.put("Result", "This endpoint is deprecated and will be removed October 31st 2016. Responder has recently changed the API to use plural resource identifiers. Please use /users instead.");
 		return response;
 	}
 
@@ -428,18 +299,34 @@ public class EchoDebuggerResource {
 			return response;
 		}
 		EchoDebuggerLogger.logAccessRequest("ROOT","DELETE_USER,p="+p,true);
-		User user = userDao.getUserById(userId);
 
-		// If we didn't find the user by "id", then they may be a legacy user registered by "echoId"
-		if(user == null){
-			user = userDao.getUserByEchoId(userId);
-		}
+		User user = (userDao.getUserById(userId)!=null) ? userDao.getUserById(userId) : userDao.getUserByEchoId(userId);
 		if(user==null){
 			EchoDebuggerLogger.logAccessRequest(userId,"DELETE_USER",false);
 			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
 		}
 
 		return userDao.deleteUser(user);
+	}
+
+	@Path("/users/{userId}/intents/{intentName}")
+	@DELETE
+	public Object deleteIntent(
+			@PathParam("userId") String userId,
+			@PathParam("intentName") String intentName){
+
+		User user = (userDao.getUserById(userId)!=null) ? userDao.getUserById(userId) : userDao.getUserByEchoId(userId);
+		if(user==null){
+			EchoDebuggerLogger.logAccessRequest(userId,"DELETE_INTENT",false);
+			throw new ResponderException("There is no user with the id of ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
+		}
+		IntentResponses intentResponses = userDao.deleteIntent(user, intentName);
+		if(intentResponses == null){
+			throw new ResponderException("There is no intent with the id of ("+intentName+") registered for user ("+userId+")", ExceptionType.UNRECOGNIZED_ID);
+		}
+		else {
+			return intentResponses;
+		}
 	}
 
 	/**
@@ -477,26 +364,29 @@ public class EchoDebuggerResource {
 		}
 		EchoDebuggerLogger.logEchoRequest(echoId,intent);
 
-		// If the user has intents registered to override default Responder intents, then use them
-		//		Set<String> registeredIntents = UserUtils.getRegisteredIntents(user);
-
 		Map<String, String> slots = ResponderUtils.getMessageAsMap(request.getRequest());
 
+		// If the user has intents registered to override default Responder intents, then use them
+		Set<String> registeredIntents = user.getIntents().keySet();
+		if(registeredIntents.contains(intent)){
+			return getUserContent(user, intent, null, slots);
+		}
+
+		// Else the user inherits some default intent processing from Responder
 		switch(intent){
 		case "AMAZON.HelpIntent":
-			//			if(!registeredIntents.contains("AMAZON.HelpIntent")){
 			return getIntro(user.getId().toString());
-			//			}
-			//			return getUserContent(user, intent, null, slots);
 		case "WHATISMYID":
 			String title = "Echo ID";
 			String content = "Your ID is "+user.getId().toString();
 			String ssml = "Your ID is now printed in the Alexa app. Please check to see the exact spelling. It is case-sensitive. This ID is unique between you and this skill. If you delete the skill you will be issued a new ID when you next connect.";
 			return AlexaResponseUtil.createSimpleResponse(title,content,ssml);
+		case "AMAZON.StopIntent":
+			return AlexaResponseUtil.createSimpleResponse(null,null,null);
+		case "AMAZON.CancelIntent":
+			return AlexaResponseUtil.createSimpleResponse(null,null,null);
 		case "START_OF_CONVERSATION":
-			//			if(!registeredIntents.contains("START_OF_CONVERSATION")){
 			intent = "GETRESPONSE";
-			//			}
 			return getUserContent(user, intent, null, slots);
 		case "GETRESPONSE":
 		default:
@@ -548,5 +438,4 @@ public class EchoDebuggerResource {
 				+ "For details, follow the documentation link that I've just printed in your Alexa app.";
 		return AlexaResponseUtil.createSimpleResponse("How to use the A.S.K. Responder",plaintext,ssml);
 	}
-
 }
