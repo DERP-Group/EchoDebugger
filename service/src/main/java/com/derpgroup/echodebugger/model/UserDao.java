@@ -40,4 +40,11 @@ public interface UserDao {
 	 */
 	public List<User> getAllUserData();
 
+	/**
+	 * Deletes a user
+	 * @param user
+	 * @return
+	 */
+	public User deleteUser(User user);
+
 }

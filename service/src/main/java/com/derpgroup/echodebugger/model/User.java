@@ -14,16 +14,6 @@ public class User {
 
 	private UUID id;
 	private String echoId;
-	private List<ResponseGroup> responseGroups = new ArrayList<ResponseGroup>();
-	@JsonIgnore
-	private Map<String, ResponseGroup> data = new HashMap<>();	// This only stores a runtime mapping of the responses
-	@JsonIgnore
-	private Map<Integer, ResponseGroup> mapOfResponseGroupsById = new HashMap<>();	// This only stores a runtime mapping of the responses
-	private int numContentUploads;
-	private int numContentDownloads;
-	private int numCharactersUploaded;
-	private int numCharactersDownloaded;
-	private int nextResponseGroupId = 0;
 
 	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "PST")
 	private Instant creationTime;
@@ -33,7 +23,22 @@ public class User {
 	private Instant lastWebDownloadTime;
 	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern="yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "PST")
 	private Instant lastEchoDownloadTime;
+
+	private int numContentUploads;
+	private int numContentDownloads;
+	private int numCharactersUploaded;
+	private int numCharactersDownloaded;
 	private int numUploadsTooLarge;
+	@JsonIgnore
+	private int nextResponseGroupId = 0;
+
+	private Map<String,IntentResponses> intents = new HashMap<>();
+
+	private List<ResponseGroup> responseGroups = new ArrayList<ResponseGroup>();
+	@JsonIgnore
+	private Map<String, ResponseGroup> data = new HashMap<>();	// This only stores a runtime mapping of the responses
+	@JsonIgnore
+	private Map<Integer, ResponseGroup> mapOfResponseGroupsById = new HashMap<>();	// This only stores a runtime mapping of the responses
 
 	public User(){}
 	public User(String echoId){
@@ -46,6 +51,8 @@ public class User {
 	public void setId(UUID id) {this.id = id;}
 	public String getEchoId() {return echoId;}
 	public void setEchoId(String echoId) {this.echoId = echoId;}
+	public Map<String, IntentResponses> getIntents() {return intents;}
+	public void setIntents(Map<String, IntentResponses> intents) {this.intents = intents;}
 	public List<ResponseGroup> getResponseGroups() {return responseGroups;}
 	public void setResponseGroups(List<ResponseGroup> responseGroups) {this.responseGroups = responseGroups;}
 	public Map<String, ResponseGroup> getData() {return data;}

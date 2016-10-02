@@ -14,13 +14,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.derpgroup.echodebugger.configuration.MainConfig;
-import com.derpgroup.echodebugger.util.UserUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -53,34 +53,23 @@ public class UserDaoLocalImpl implements UserDao{
 				mapOfUsersByEchoId.put(user.getEchoId(), user);
 				mapOfIdToUserId.put(user.getId().toString(), user.getEchoId());
 
-				// Backwards compatible changes
-				List<ResponseGroup> responseGroups = user.getResponseGroups();
-				if(CollectionUtils.isNotEmpty(responseGroups)){
-					for(ResponseGroup group : responseGroups){
-						if(user.getNextResponseGroupId() == 0){
-							user.setNextResponseGroupId(1);
-						}
-						List<Response> responses = group.getResponses();
-						if(CollectionUtils.isNotEmpty(responses)){
-							if(group.getNextResponseId() == 0){
-								group.setNextResponseId(1);
-							}
-							for(Response response : responses){
-								String responseId = response.getId();
-								Integer id = 0;
-								try{
-									id = Integer.parseInt(responseId);
-								}
-								catch(Exception e){
-									id = 0;	// Bury it alive
-								}
-								response.setId(id.toString());
-							}
+				// TODO: Remove this
+				// If they have the old format, and not the new format, convert them
+				if(MapUtils.isEmpty(user.getIntents()) && CollectionUtils.isNotEmpty(user.getResponseGroups())){
+					IntentResponses intent = new IntentResponses();
+					intent.setIntentName("GETRESPONSE");
+					ResponseGroup responseGroup = user.getResponseGroups().get(0);
+					if(responseGroup != null && CollectionUtils.isNotEmpty(responseGroup.getResponses())){
+						Response response = responseGroup.getResponses().get(0);
+						if(response != null){
+							intent.setData(response.getData());
 						}
 					}
+					user.getIntents().put("GETRESPONSE", intent);
 				}
+				user.setResponseGroups(null);
 
-				UserUtils.mapResponsesIntoUser(user);
+				//				UserUtils.mapResponsesIntoUser(user);	// TODO: Remove
 			}
 			initialized = true;
 		} catch (IOException e) {
@@ -136,7 +125,14 @@ public class UserDaoLocalImpl implements UserDao{
 		return usersList;
 	}
 
-
+	@Override
+	public User deleteUser(User user){
+		if(mapOfUsersByEchoId.containsKey(user.getEchoId())){
+			mapOfUsersByEchoId.remove(user.getEchoId());
+		}
+		saveUsersToFile();
+		return user;
+	}
 
 	// Local helper functions
 	protected List<User> readUsersFromFile(String fileName) throws IOException{
